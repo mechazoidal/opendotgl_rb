@@ -60,8 +60,8 @@ class Triangle
                           Utils::NullPtr            # array buffer offset
                          )
 
-    colAttrib = glGetAttribLocation(shaderProgram, "color");
-    glEnableVertexAttribArray(colAttrib);
+    colAttrib = glGetAttribLocation(shaderProgram, "color")
+    glEnableVertexAttribArray(colAttrib)
     glVertexAttribPointer(colAttrib,
                           3,
                           GL_FLOAT,
@@ -82,7 +82,7 @@ class Triangle
         end
       end
       #render
-      glClearColor(0.0, 0.0, 0.0, 1.0);
+      glClearColor(0.0, 0.0, 0.0, 1.0)
       glClear(GL_COLOR_BUFFER_BIT)
 
       glDrawArrays(GL_TRIANGLES, 0, vertices.length)
