@@ -1,8 +1,15 @@
-require_relative './lib/shader'
-#require_relative './lib/utils'
+require_relative './lib/utils'
 require_relative './lib/window'
 
 class Triangle
+  NAME = "triangle"
+  #VERT_SHADER = "solid_vert.glsl"
+  #FRAG_SHADER = "solid_frag.glsl"
+  VERT_SHADER = "triangle_vert_shader.glsl"
+  FRAG_SHADER = "triangle_frag_shader.glsl"
+  VERT_SOURCE = File.join("shaders", NAME, VERT_SHADER)
+  FRAG_SOURCE = File.join("shaders", NAME, FRAG_SHADER)
+
   def draw(window)
 
     @running = true
@@ -14,11 +21,11 @@ class Triangle
     glBindVertexArray(vao)
 
     vertices = [
-          [ 0.0,  0.5],
-          [ 0.5, -0.5],
-          [-0.5, -0.5]]
+      [ 0.0,  0.5, 0.0 ],
+      [ 0.5, -0.5, 0.5 ],
+      [-0.5, -0.5, 1.0 ]]
+    #vertices_gray = vertices.map {|n| n[0..1]} # for just the xy coords
 
-    # Odd note: we reused buf, but that's OK because it's just a destination for the integer that comes back from Opengl
     vbo_buf = Fiddle::Pointer.malloc(Fiddle::SIZEOF_INT)
     glGenBuffers(1, buf)
     vbo = buf[0, Fiddle::SIZEOF_INT].unpack('L')[0]
@@ -26,47 +33,42 @@ class Triangle
     vertices_data_ptr = Fiddle::Pointer[vertices.flatten.pack("F*")]
     vertices_data_size = Fiddle::SIZEOF_FLOAT * vertices.flatten.length
     glBufferData(GL_ARRAY_BUFFER, vertices_data_size, vertices_data_ptr, GL_STATIC_DRAW)
-    
-    # vertexShader
 
-    # TODO should really just do these manually for now, to reduce errors
-    shader = Shader.new
-    shader.load( vertex_code: File.open("shaders/triangle/solid_vert.glsl", "r") {|f| f.read},
-                 fragment_code: File.open("shaders/triangle/solid_frag.glsl", "r") {|f| f.read})
-    shader.use
+    vertexShader = Utils::Shader.new(GL_VERTEX_SHADER)
+    @running = false unless vertexShader.load(File.open(VERT_SOURCE, "r") {|f| f.read})
+
+    fragShader = Utils::Shader.new(GL_FRAGMENT_SHADER)
+    @running = false unless fragShader.load(File.open(FRAG_SOURCE, "r") {|f| f.read})
+
+    shaderProgram = glCreateProgram()
+    glAttachShader(shaderProgram, vertexShader.id)
+    glAttachShader(shaderProgram, fragShader.id)
+
+    glLinkProgram(shaderProgram)
+    glUseProgram(shaderProgram)
+
 
     # Specify the layout of the vertex data
-    posAttrib = glGetAttribLocation(shader.program_id, "position")
+    posAttrib = glGetAttribLocation(shaderProgram, "position")
     glEnableVertexAttribArray(posAttrib)
     glVertexAttribPointer(posAttrib,                # location
                           2,                        # size
                           GL_FLOAT,                 # type
                           GL_FALSE,                 # normalized?
-                          #Fiddle::SIZEOF_FLOAT * 3, # stride
-                          0,
-                          NullPtr                   # array buffer offset
+                          Fiddle::SIZEOF_FLOAT * vertices[0].length, #stride
+                          #0,                       # stride
+                          Utils::NullPtr            # array buffer offset
                          )
 
-    #GLint colAttrib = glGetAttribLocation(shaderProgram, "color");
-    #glEnableVertexAttribArray(colAttrib);
-    #glVertexAttribPointer(colAttrib, 1, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (void*)(2 * sizeof(GLfloat)));
-
-    #colAttrib = glGetAttribLocation(shader.program_id, "color")
-    #glEnableVertexAttribArray(colAttrib)
-    # BUG HERE
-    # GL_INVALID_OPERATION in glVertexAttribPointer(non-VBO array)
-    #glVertexAttribPointer(colAttrib, 1, GL_FLOAT, GL_FALSE, Fiddle::SIZEOF_FLOAT * 3, Fiddle::SIZEOF_FLOAT * 2)
-    #glVertexAttribPointer(colAttrib, 1, GL_FLOAT, GL_FALSE, Fiddle::SIZEOF_FLOAT * 5, Fiddle::SIZEOF_FLOAT * 2)
-    # No GL error, but nothing appears
-    #glVertexAttribPointer(colAttrib, 1, GL_FLOAT, GL_FALSE, Fiddle::SIZEOF_FLOAT * 3, 2)
-
-    #glVertexAttribPointer(colAttrib, Attribute::COLOR, GL_FLOAT, GL_FALSE, Fiddle::SIZEOF_FLOAT * 3, Fiddle::SIZEOF_FLOAT * 2)
-
-    #in opengl-bindings, the last argument is a Fiddle::TYPE_VOIDP
-    #vap = Fiddle::Pointer.malloc(Fiddle::SIZEOF_FLOAT * 2)
-    #glVertexAttribPointer(colAttrib, 1, GL_FLOAT, GL_FALSE, Fiddle::SIZEOF_FLOAT * 3, vap)
-
-    #glVertexAttribPointer(colAttrib, 1, GL_FLOAT, GL_FALSE, Fiddle::SIZEOF_FLOAT * 3, 2)
+    colAttrib = glGetAttribLocation(shaderProgram, "color");
+    glEnableVertexAttribArray(colAttrib);
+    glVertexAttribPointer(colAttrib,
+                          3,
+                          GL_FLOAT,
+                          GL_FALSE,
+                          Fiddle::SIZEOF_FLOAT * vertices[0].length,
+                          (Fiddle::Pointer[0] + Fiddle::SIZEOF_FLOAT * 2) # "Offset" pointer: space for 2 floats, cast to void*
+                         )
 
     while @running
       event = SDL2::Event.poll
@@ -90,5 +92,5 @@ class Triangle
   end
 end
 
-window = Window.new(800, 600)
+window = Window.new(800, 600, "triangle", true)
 Triangle.new.draw(window)
