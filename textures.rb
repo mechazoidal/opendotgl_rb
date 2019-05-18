@@ -213,7 +213,6 @@ class Textures
 
   end
 
-  #def load_texture(filename, name, slot, texBuffer, shader)
   def load_texture(filename, name, slot, texBuffer)
     # FIXME there's a difference between SOIL and ChunkyPNG loading:
     # loading with C_P makes it look like the scanlines are out of wack, so 
@@ -223,7 +222,20 @@ class Textures
     glActiveTexture(slots[slot])
     glBindTexture(GL_TEXTURE_2D, texBuffer)
 
-    image = File.open(filename, 'rb') {|io| ChunkyPNG::Canvas.from_io(io)}
+    # Simple caching using ChunkyPNG's rgb_stream
+    # Filename should be in the pattern: "#{filename}.#{width}.#{height}.rgb"
+    image = nil
+    Dir.glob("*.rgb") do |pathname|
+      dimensions = pathname.scan(/(\d+)/).flatten
+      if dimensions.length == 2 and File.owned?(pathname)
+        image = File.open(pathname, 'rb') {|io| ChunkyPNG::Image.from_rgb_stream(dimensions[0].to_i, dimensions[1].to_i, io)}
+        break
+      end
+    end
+    if image.nil?
+      image = File.open(filename, 'rb') {|io| ChunkyPNG::Image.from_io(io)}
+      File.open("#{filename}.#{image.width}.#{image.height}.rgb", 'wb') {|f| f.write(image.to_rgb_stream)}
+    end
     image_ptr = Fiddle::Pointer[image.pixels.pack("L*")]
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, image.width, image.height, 0, GL_RGB, GL_UNSIGNED_BYTE, image_ptr)
     # unsure how/if to free image itself after pixels are sent to opengl
