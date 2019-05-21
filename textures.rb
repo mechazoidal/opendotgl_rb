@@ -1,8 +1,8 @@
-require 'chunky_png'
-
 require_relative './lib/window'
 require_relative './lib/utils'
 
+# sample_earth: https://nasa3d.arc.nasa.gov/detail/as10-34-5013
+# sample_moon: https://nasa3d.arc.nasa.gov/detail/as11-44-6665
 class Textures
   attr_reader :name
   Vertices = [    #  Position      Color             Texcoords
@@ -18,9 +18,10 @@ class Textures
   def initialize(window, frag_shader)
     @window = window
     @name = "textures"
-    @vert_shader = "vert_shader.glsl"
-    @vert_source = File.join("shaders", @name, @vert_shader)
+    @vert_source = File.join("shaders", @name, "vert_shader.glsl")
     @frag_source = File.join("shaders", @name, frag_shader)
+
+    @textures = [GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2]
 
     @running = true
 
@@ -68,35 +69,43 @@ class Textures
     glUseProgram(@shaderProgram)
 
     #vertex data and attributes
+    # Note that if your fragment shader does not use an attribute at some point, the GLSL compiler is free to strip it!
+    # Thus we can't blindly enable the vertex attrib array unless we get a real location back.
     posAttrib = glGetAttribLocation(@shaderProgram, "position")
-    glEnableVertexAttribArray(posAttrib)
-    glVertexAttribPointer(posAttrib,                # location
-                          2,                        # size
-                          GL_FLOAT,                 # type
-                          GL_FALSE,                 # normalized?
-                          Fiddle::SIZEOF_FLOAT * Vertices[0].length, # stride: 5 items in each vertex(x,y,r,g,b)
-                          0        # no offset required
-                         )
+    if posAttrib != -1
+      glEnableVertexAttribArray(posAttrib)
+      glVertexAttribPointer(posAttrib,                # location
+                            2,                        # size
+                            GL_FLOAT,                 # type
+                            GL_FALSE,                 # normalized?
+                            Fiddle::SIZEOF_FLOAT * Vertices[0].length, # stride: 5 items in each vertex(x,y,r,g,b)
+                            0        # no offset required
+                           )
+    end
 
     colAttrib = glGetAttribLocation(@shaderProgram, "color")
-    glEnableVertexAttribArray(colAttrib)
-    glVertexAttribPointer(colAttrib,
-                          3,
-                          GL_FLOAT,
-                          GL_FALSE,
-                          Fiddle::SIZEOF_FLOAT * Vertices[0].length,
-                          (Fiddle::Pointer[0] + Fiddle::SIZEOF_FLOAT * 2) # "Offset" pointer: space for 2 floats, cast to void*
-                         )
+    if colAttrib != -1
+      glEnableVertexAttribArray(colAttrib)
+      glVertexAttribPointer(colAttrib,
+                            3,
+                            GL_FLOAT,
+                            GL_FALSE,
+                            Fiddle::SIZEOF_FLOAT * Vertices[0].length,
+                            (Fiddle::Pointer[0] + Fiddle::SIZEOF_FLOAT * 2) # "Offset" pointer: space for 2 floats, cast to void*
+                           )
+    end
 
     texAttrib = glGetAttribLocation(@shaderProgram, "texcoord")
-    glEnableVertexAttribArray(texAttrib)
-    glVertexAttribPointer(texAttrib,
-                          2,
-                          GL_FLOAT,
-                          GL_FALSE,
-                          Fiddle::SIZEOF_FLOAT * Vertices[0].length,
-                          (Fiddle::Pointer[0] + Fiddle::SIZEOF_FLOAT * 5) # "Offset" pointer: space for 2 floats, cast to void*
-                         )
+    if texAttrib != -1
+      glEnableVertexAttribArray(texAttrib)
+      glVertexAttribPointer(texAttrib,
+                            2,
+                            GL_FLOAT,
+                            GL_FALSE,
+                            Fiddle::SIZEOF_FLOAT * Vertices[0].length,
+                            (Fiddle::Pointer[0] + Fiddle::SIZEOF_FLOAT * 5) # "Offset" pointer: space for 2 floats, cast to void*
+                           )
+    end
   end
 
   def draw_checkerboard
@@ -174,13 +183,11 @@ class Textures
     tex = tex_buf[0, Fiddle::SIZEOF_INT].unpack('L')[0]
     glBindTexture(GL_TEXTURE_2D, tex)
 
-    # FIXME there's a difference between SOIL and ChunkyPNG loading:
-    # loading with C_P makes it look like the scanlines are out of wack, so 
-    # there's some difference between what opengl expects and what chunkyPNG is giving
-    image = File.open('sample.png', 'rb') {|io| ChunkyPNG::Canvas.from_io(io)}
-    image_ptr = Fiddle::Pointer[image.pixels.pack("L*")]
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, image.width, image.height, 0, GL_RGB, GL_UNSIGNED_BYTE, image_ptr)
-    # unsure how/if to free image itself after pixels are sent to opengl
+    image = SDL2::Surface.load('sample_earth.png')
+    image_ptr = Fiddle::Pointer[image.pixels]
+    mode = image.bytes_per_pixel == 4 ? GL_RGBA : GL_RGB
+    glTexImage2D(GL_TEXTURE_2D, 0, mode, image.w, image.h, 0, GL_RGB, GL_UNSIGNED_BYTE, image_ptr)
+    image.destroy
 
     #x,y,z = s,t,r in textures
     #set clamping for s and t coordinates
@@ -214,36 +221,9 @@ class Textures
   end
 
   def load_texture(filename, name, slot, texBuffer)
-    # FIXME there's a difference between SOIL and ChunkyPNG loading:
-    # loading with C_P makes it look like the scanlines are out of wack, so 
-    # there's some difference between what opengl expects and what chunkyPNG is giving
-    slots = [GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2]
-
-    glActiveTexture(slots[slot])
+    @window.logger.debug "load_texture: loading #{filename} to name #{name} at slot #{slot}(#{@textures[slot]}) to buffer #{texBuffer}"
+    glActiveTexture(@textures[slot])
     glBindTexture(GL_TEXTURE_2D, texBuffer)
-
-    # Simple caching using ChunkyPNG's rgb_stream
-    # Filename should be in the pattern: "#{filename}.#{width}.#{height}.rgb"
-    image = nil
-    Dir.glob("*.rgb") do |pathname|
-      dimensions = pathname.scan(/(\d+)/).flatten
-      if dimensions.length == 2 and File.owned?(pathname)
-        image = File.open(pathname, 'rb') {|io| ChunkyPNG::Image.from_rgb_stream(dimensions[0].to_i, dimensions[1].to_i, io)}
-        break
-      end
-    end
-    if image.nil?
-      image = File.open(filename, 'rb') {|io| ChunkyPNG::Image.from_io(io)}
-      File.open("#{filename}.#{image.width}.#{image.height}.rgb", 'wb') {|f| f.write(image.to_rgb_stream)}
-    end
-    image_ptr = Fiddle::Pointer[image.pixels.pack("L*")]
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, image.width, image.height, 0, GL_RGB, GL_UNSIGNED_BYTE, image_ptr)
-    # unsure how/if to free image itself after pixels are sent to opengl
-    #uni_buf = Fiddle::Pointer.malloc(Fiddle::SIZEOF_INT)
-
-    uni_buf = glGetUniformLocation(@shaderProgram, name)
-    #puts uni_buf.inspect
-    glUniform1i(uni_buf, slot)
 
     #x,y,z = s,t,r in textures
     #set clamping for s and t coordinates
@@ -254,30 +234,29 @@ class Textures
     #Specify interpolation for scaling up/down*/
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+
+    image = SDL2::Surface.load(filename)
+    image_ptr = Fiddle::Pointer[image.pixels]
+    mode = image.bytes_per_pixel == 4 ? GL_RGBA : GL_RGB
+    glTexImage2D(GL_TEXTURE_2D, 0, mode, image.w, image.h, 0, GL_RGB, GL_UNSIGNED_BYTE, image_ptr)
+    image.destroy
+
+    uni_buf = glGetUniformLocation(@shaderProgram, name)
+    @window.logger.debug "attribute #{name} location: #{uni_buf.inspect}"
+    glUniform1i(uni_buf, slot)
+    nil
   end
 
-  def draw_anim_blend_texture
-    start_time = SDL2::get_ticks / 1000.0
-    current_time = 0.0
+  def draw_blend_texture
     tex_buf = Fiddle::Pointer.malloc(Fiddle::SIZEOF_INT * 2)
     glGenTextures(2, tex_buf)
-    #puts tex_buf.inspect
-    #tex = tex_buf[0, Fiddle::SIZEOF_INT*2].unpack('L') #[0]
-    #tex = tex_buf[0, Fiddle::SIZEOF_INT * 2].unpack('L') #[0]
     tex = [tex_buf[0, Fiddle::SIZEOF_INT].unpack('L')[0], tex_buf[Fiddle::SIZEOF_INT, Fiddle::SIZEOF_INT*2].unpack('L')[0]]
-    #puts tex.inspect
-    #glBindTexture(GL_TEXTURE_2D, tex)
 
-    # FIXME there's a difference between SOIL and ChunkyPNG loading:
-    # loading with C_P makes it look like the scanlines are out of wack, so 
-    # there's some difference between what opengl expects and what chunkyPNG is giving
-    load_texture('sample.png', 'texKitten', 0, tex[0])
-    load_texture('sample2.png', 'texPuppy', 1, tex[1])
+    load_texture('sample_earth.png', 'texEarth', 0, tex[0])
+    load_texture('sample_moon.png', 'texMoon', 1, tex[1])
 
     # unsure how/if to free image itself after pixels are sent to opengl
 
-    uni_time = glGetUniformLocation(@shaderProgram, "time")
-    puts uni_time.inspect
     while @running
       event = SDL2::Event.poll
       case event
@@ -293,8 +272,44 @@ class Textures
       glClearColor(0.0, 0.0, 0.0, 1.0)
       glClear(GL_COLOR_BUFFER_BIT)
 
-      currentTime = SDL2::get_ticks / 1000.0
-      glUniform1f(uni_time, (current_time - start_time))
+      glDrawElements(GL_TRIANGLES, Elements.length, GL_UNSIGNED_INT, 0)
+
+      @window.window.gl_swap
+    end
+  end
+
+  def draw_anim_blend_texture
+    start_time = SDL2::get_ticks / 1000.0
+    current_time = 0.0
+    tex_buf = Fiddle::Pointer.malloc(Fiddle::SIZEOF_INT * 2)
+    glGenTextures(2, tex_buf)
+    tex = [tex_buf[0, Fiddle::SIZEOF_INT].unpack('L')[0], tex_buf[Fiddle::SIZEOF_INT, Fiddle::SIZEOF_INT*2].unpack('L')[0]]
+
+    load_texture('sample_earth.png', 'texEarth', 0, tex[0])
+    load_texture('sample_moon.png', 'texMoon', 1, tex[1])
+
+    uni_time = glGetUniformLocation(@shaderProgram, "uniTime")
+    @window.logger.debug "texUniform: #{glGetUniformLocation(@shaderProgram, "texEarth")}"
+    @window.logger.debug "texUniform: #{glGetUniformLocation(@shaderProgram, "texMoon")}"
+    @window.logger.debug "uni_time location: #{uni_time.inspect}"
+    while @running
+      event = SDL2::Event.poll
+      case event
+      when SDL2::Event::Quit
+        @running = false
+      when SDL2::Event::KeyUp
+        case event.sym
+        when SDL2::Key::ESCAPE, SDL2::Key::Q
+          @running = false
+        end
+      end
+
+      glClearColor(0.0, 0.0, 0.0, 1.0)
+      glClear(GL_COLOR_BUFFER_BIT)
+
+      current_time = SDL2::get_ticks / 1000.0
+      time = (current_time - start_time)
+      glUniform1f(uni_time, time)
       glDrawElements(GL_TRIANGLES, Elements.length, GL_UNSIGNED_INT, 0)
 
       @window.window.gl_swap
@@ -302,7 +317,8 @@ class Textures
   end
 end
 
-window = Window.new(800, 600, "textures", true)
+window = Window.new(800, 600, "textures")
 #Textures.new(window, "no_tex_frag.glsl").draw_checkerboard
 #Textures.new(window, "one_texture_frag.glsl").draw_texture
+#Textures.new(window, "two_textures_frag.glsl").draw_blend_texture
 Textures.new(window, "anim_tex_frag_shader.glsl").draw_anim_blend_texture
