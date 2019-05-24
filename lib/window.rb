@@ -1,5 +1,4 @@
 require 'opengl'
-#require 'logger'
 
 require_relative 'utils'
 
@@ -23,11 +22,10 @@ class Window
   attr_reader :window
 
   def initialize(width, height, name = "opendotgl_rb", debug = false)
-    @debug = debug
-    @logger = Logger.new(STDOUT)
-    debug ? @logger.level = Logger::DEBUG : @logger.level = Logger::INFO
-    original_formatter = Logger::Formatter.new
-    @logger.formatter = proc {|severity, datetime, progname, msg| "#{severity} -- #{msg}\n"}
+    debug ? logger.level = :debug : logger.level = :info
+    logger.formatter = proc {|severity, datetime, progname, msg|
+      "[#{datetime.strftime("%Y-%m-%d %H:%M:%S.%s")}] #{severity} -- #{msg}\n"
+    }
 
     @running = false
     SDL2.init(SDL2::INIT_VIDEO)
@@ -44,25 +42,22 @@ class Window
     SDL2::GL.set_attribute(SDL2::GL::CONTEXT_MINOR_VERSION, 2)
     SDL2::GL.set_attribute(SDL2::GL::STENCIL_SIZE, 8)
 
-    if @debug
+    if debug
       # request debug context
-      @logger.info "OpenGL debug context requested"
+      logger.info "OpenGL debug context requested"
       SDL2::GL.set_attribute(SDL2::GL::CONTEXT_FLAGS, SDL2::GL::CONTEXT_DEBUG_FLAG)
     end
 
     @window = SDL2::Window.create(name, 0, 0, width, height, SDL2::Window::Flags::OPENGL)
     @context = SDL2::GL::Context.create(@window)
-    #print("SDL2 OpenGL version %d.%d\n",
-            #SDL2::GL.get_attribute(SDL2::GL::CONTEXT_MAJOR_VERSION),
-            #SDL2::GL.get_attribute(SDL2::GL::CONTEXT_MINOR_VERSION))
-    @logger.info {"SDL2 OpenGL version #{SDL2::GL.get_attribute(SDL2::GL::CONTEXT_MAJOR_VERSION)}.#{SDL2::GL.get_attribute(SDL2::GL::CONTEXT_MINOR_VERSION)}"}
+    logger.info {"SDL2 OpenGL version #{SDL2::GL.get_attribute(SDL2::GL::CONTEXT_MAJOR_VERSION)}.#{SDL2::GL.get_attribute(SDL2::GL::CONTEXT_MINOR_VERSION)}"}
     # GLEW/GLEE isn't needed since opengl-bindings gem automatically enumerates all available dynamic functions&constants
 
-    if @debug
+    if debug
       # check if we did get a debug context
       # FIXME need to AND the flags to make sure it's right
       if SDL2::GL.get_attribute(SDL2::GL::CONTEXT_FLAGS) == 1
-        @logger.info "OpenGL debug context activated"
+        logger.info "OpenGL debug context activated"
         Utils::gl_enable_debug_output
       end
     end

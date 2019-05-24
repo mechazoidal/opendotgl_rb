@@ -4,6 +4,7 @@ require_relative './lib/utils'
 # sample_earth: https://nasa3d.arc.nasa.gov/detail/as10-34-5013
 # sample_moon: https://nasa3d.arc.nasa.gov/detail/as11-44-6665
 class Textures
+  include Logging
   attr_reader :name
   Vertices = [    #  Position      Color             Texcoords
                   [ -0.5,  0.5, 1.0, 0.0, 0.0, 0.0, 0.0 ], # Top-left
@@ -221,7 +222,7 @@ class Textures
   end
 
   def load_texture(filename, name, slot, texBuffer)
-    @window.logger.debug "load_texture: loading #{filename} to name #{name} at slot #{slot}(#{@textures[slot]}) to buffer #{texBuffer}"
+    logger.debug {"load_texture: loading #{filename} to name #{name} at slot #{slot}(#{@textures[slot]}) to buffer #{texBuffer}"}
     glActiveTexture(@textures[slot])
     glBindTexture(GL_TEXTURE_2D, texBuffer)
 
@@ -242,7 +243,7 @@ class Textures
     image.destroy
 
     uni_buf = glGetUniformLocation(@shaderProgram, name)
-    @window.logger.debug "attribute #{name} location: #{uni_buf.inspect}"
+    logger.debug {"attribute #{name} location: #{uni_buf.inspect}"}
     glUniform1i(uni_buf, slot)
     nil
   end
@@ -254,8 +255,6 @@ class Textures
 
     load_texture('sample_earth.png', 'texEarth', 0, tex[0])
     load_texture('sample_moon.png', 'texMoon', 1, tex[1])
-
-    # unsure how/if to free image itself after pixels are sent to opengl
 
     while @running
       event = SDL2::Event.poll
@@ -289,9 +288,9 @@ class Textures
     load_texture('sample_moon.png', 'texMoon', 1, tex[1])
 
     uni_time = glGetUniformLocation(@shaderProgram, "uniTime")
-    @window.logger.debug "texUniform: #{glGetUniformLocation(@shaderProgram, "texEarth")}"
-    @window.logger.debug "texUniform: #{glGetUniformLocation(@shaderProgram, "texMoon")}"
-    @window.logger.debug "uni_time location: #{uni_time.inspect}"
+    logger.debug {"texUniform: #{glGetUniformLocation(@shaderProgram, "texEarth")}"}
+    logger.debug {"texUniform: #{glGetUniformLocation(@shaderProgram, "texMoon")}"}
+    logger.debug {"uni_time location: #{uni_time.inspect}"}
     while @running
       event = SDL2::Event.poll
       case event

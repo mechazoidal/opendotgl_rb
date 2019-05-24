@@ -17,7 +17,6 @@ end
 
 module Utils
   NullPtr = Fiddle::Pointer[0]
-  #include Logging
   SEVERITY = {OpenGL::GL_DEBUG_SEVERITY_HIGH => :high,
               OpenGL::GL_DEBUG_SEVERITY_MEDIUM => :medium,
               OpenGL::GL_DEBUG_SEVERITY_LOW => :low,
@@ -34,23 +33,26 @@ module Utils
           OpenGL::GL_DEBUG_TYPE_PERFORMANCE => :performance}
 
   def self.check_errors( desc )
+    include Logging
     e = glGetError()
     if e != GL_NO_ERROR
-      sprintf "OpenGL error in \"#{desc}\": e=0x%08x\n", e.to_i
-      #$stderr.printf "OpenGL error in \"#{desc}\": e=0x%08x\n", e.to_i
-      #logger.error { "OpenGL error in \"#{desc}\": e=0x%08x\n", e.to_i }
+      logger.error sprintf "glGetError: \"#{desc}\", code=0x%08x\n", e.to_i
       exit
     end
   end
 
   def self.gl_enable_debug_output
 
-    closure = Class.new(Fiddle::Closure) { 
+    closure = Class.new(Fiddle::Closure) {
 
+      include Logging
       def call(source, type, id, severity, length, message)
-        # TODO it'd be nice to send this straight to a logger
-        #type == GL_DEBUG_TYPE_ERROR ? @logger.error(message) : @logger.debug(message)
-        puts "GL CALLBACK: #{type == GL_DEBUG_TYPE_ERROR ? "** GL ERROR **" : ""} type: #{TYPE[type].to_s}, severity: #{SEVERITY[severity].to_s}, message: #{message}"
+        msg = "GL::#{SEVERITY[severity].to_s}::#{TYPE[type].to_s} -- #{message}"
+        if type == GL_DEBUG_TYPE_ERROR
+          logger.error(msg)
+        else
+          logger.debug(msg)
+        end
       end
     }.new(Fiddle::TYPE_VOID, [Fiddle::TYPE_INT, Fiddle::TYPE_INT, Fiddle::TYPE_INT, Fiddle::TYPE_SIZE_T, Fiddle::TYPE_CHAR, Fiddle::TYPE_VOIDP])
 
@@ -64,7 +66,7 @@ module Utils
     def initialize(type = "GL_VERTEX_SHADER")
       @id = glCreateShader(type)
     end
-  
+
     def load(source)
       status = GL_FALSE
       src = [source].pack('p')
