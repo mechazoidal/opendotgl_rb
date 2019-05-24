@@ -19,7 +19,7 @@ require 'sdl2'
 class Window
   include Logging
 
-  attr_reader :window
+  attr_reader :window, :width, :height
 
   def initialize(width, height, name = "opendotgl_rb", debug = false)
     debug ? logger.level = :debug : logger.level = :info
@@ -48,7 +48,9 @@ class Window
       SDL2::GL.set_attribute(SDL2::GL::CONTEXT_FLAGS, SDL2::GL::CONTEXT_DEBUG_FLAG)
     end
 
-    @window = SDL2::Window.create(name, 0, 0, width, height, SDL2::Window::Flags::OPENGL)
+    @width = width
+    @height = height
+    @window = SDL2::Window.create(name, 0, 0, @width, @height, SDL2::Window::Flags::OPENGL)
     @context = SDL2::GL::Context.create(@window)
     logger.info {"SDL2 OpenGL version #{SDL2::GL.get_attribute(SDL2::GL::CONTEXT_MAJOR_VERSION)}.#{SDL2::GL.get_attribute(SDL2::GL::CONTEXT_MINOR_VERSION)}"}
     # GLEW/GLEE isn't needed since opengl-bindings gem automatically enumerates all available dynamic functions&constants
