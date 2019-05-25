@@ -61,6 +61,7 @@ module Utils
   end
 
 
+
   module RadianHelper
     refine Float do
       def to_rad
@@ -72,10 +73,12 @@ module Utils
   class Shader
     include Logging
 
+    #AttribTypes = {float: {gl: GL_FLOAT, pointer: Fiddle::SIZEOF_FLOAT}
     attr_reader :id
     def initialize(type = "GL_VERTEX_SHADER")
       @id = glCreateShader(type)
     end
+
 
     def load(source)
       status = GL_FALSE
@@ -98,6 +101,84 @@ module Utils
         logger.error log
       end
       status == GL_TRUE ? true : false
+    end
+
+  end
+
+  class ShaderProgram
+    include Logging
+    attr_reader :id, :linked, :in_use
+    def initialize
+      @id = glCreateProgram()
+      @attached = []
+      @frag_locations = []
+      @linked = false
+      @in_use = false
+    end
+
+    def attach(shader)
+      glAttachShader(@id, shader.id)
+      @attached << shader.id
+      shader.id
+    end
+
+    def link_and_use
+      glLinkProgram(@id)
+      @linked = true
+      glUseProgram(@id)
+      @in_use = true
+      #true
+    end
+
+    def bind(name)
+      slot = @frag_locations.length
+      glBindFragDataLocation(@id, slot, name)
+      @frag_locations << name
+      slot
+    end
+
+    # TODO should probably take hash args
+    def enable_vertex_attrib(name, size, type, stride, offset=0)
+      enableAttrib = glGetAttribLocation(@id, name)
+      if enableAttrib != -1
+        glEnableVertexAttribArray(enableAttrib)
+        logger.debug "enabling vertex attrib array for #{name}(#{enableAttrib}): size: #{size}, type: #{type.to_s}, stride: #{stride}, offset: #{offset}" 
+        glVertexAttribPointer(enableAttrib, # location
+                              size,
+                              gl_type(type),
+                              GL_FALSE,     # normalized?
+                              fiddle_type(type) * stride,
+                              # Yes, the offset is weird(an offset void* pointer)
+                              # Blame the OpenGL ARB
+                              Utils::NullPtr + fiddle_type(type) * offset # A void* ptr
+                             )
+        enableAttrib
+      else
+        logger.debug("shader vertex attribute '#{name}' was requested but not found(probably stripped/unused")
+        nil
+      end
+    end
+
+    def uniform_location(name)
+      glGetUniformLocation(@id, name)
+
+    end
+    def gl_type(type_name)
+      begin
+        Object.const_get("GL_#{type_name.to_s.upcase}")
+      rescue NameError
+        logger.info("gl_type: '#{type_name}' does not match a GL_ constant")
+        return nil
+      end
+    end
+
+    def fiddle_type(type_name)
+      begin
+        Object.const_get("Fiddle::SIZEOF_#{type_name.to_s.upcase}")
+      rescue NameError
+        logger.info("fiddle_type: '#{type_name}' does not match a Fiddle::SIZEOF_ constant")
+        return nil
+      end
     end
   end
 
@@ -129,7 +210,7 @@ module Utils
       tex_slot = tex_buf[0, Fiddle::SIZEOF_INT].unpack('L')[0]
       # TODO not really sure if I need this call to activeTexture?
       glActiveTexture(Object.const_get("GL_TEXTURE#{slot}"))
-      logger.debug {"load_texture: loading #{filename} to name #{name} to buffer #{tex_slot} in unit #{slot}(GL_TEXTURE#{slot})"}
+      logger.debug {"load_texture: loading #{filename} to name #{name} to buffer #{tex_slot}, unit GL_TEXTURE#{slot}"}
       glBindTexture(GL_TEXTURE_2D, tex_slot)
 
       #x,y,z = s,t,r in textures
