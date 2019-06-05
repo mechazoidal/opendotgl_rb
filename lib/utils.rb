@@ -72,9 +72,16 @@ module Utils
     include Logging
 
     #AttribTypes = {float: {gl: GL_FLOAT, pointer: Fiddle::SIZEOF_FLOAT}
+    #Types = {GL_VERTEX_SHADER   => :vertex,
+             #GL_FRAGMENT_SHADER => :fragment,
+             #GL_GEOMETRY_SHADER => :geometry}
+    Types = {:vertex => OpenGL::GL_VERTEX_SHADER,
+             :fragment => OpenGL::GL_FRAGMENT_SHADER,
+             :geometry => OpenGL::GL_GEOMETRY_SHADER}
+
     attr_reader :id
-    def initialize(type = "GL_VERTEX_SHADER")
-      @id = glCreateShader(type)
+    def initialize(type = :vertex)
+      @id = glCreateShader(Types[type])
     end
 
 
@@ -134,14 +141,26 @@ module Utils
       use
     end
 
-    def create_from(vertex_shader_source, frag_shader_source)
-      vertexShader = Utils::Shader.new(GL_VERTEX_SHADER)
+    def create_from_vert_frag(vertex_shader_source, frag_shader_source)
+      vertexShader = Utils::Shader.new(:vertex)
       vertexShader.load(vertex_shader_source)
-      fragShader = Utils::Shader.new(GL_FRAGMENT_SHADER)
+      fragShader = Utils::Shader.new(:fragment)
       fragShader.load(frag_shader_source)
       attach(vertexShader)
       attach(fragShader)
       link
+    end
+
+    # ex: [[:vertex, <source>], [:fragment, <source>]]
+    def create_from(shader_source_array)
+      shader_source_array.each {|s| load_and_attach(s[0], s[1])}
+      link
+    end
+
+    def load_and_attach(type, shader_source)
+      shader = Utils::Shader.new(type)
+      shader.load(shader_source)
+      attach(shader)
     end
 
     def bind_frag(name)

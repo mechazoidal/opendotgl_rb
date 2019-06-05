@@ -90,10 +90,10 @@ class Stencils
     # No element buffers required for this lesson, as we use glDrawArrays
 
     # setup shaders
-    vertexShader = Utils::Shader.new(GL_VERTEX_SHADER)
+    vertexShader = Utils::Shader.new(:vertex)
     @running = false unless vertexShader.load(File.open(@vert_source, "r") {|f| f.read})
 
-    fragShader = Utils::Shader.new(GL_FRAGMENT_SHADER)
+    fragShader = Utils::Shader.new(:fragment)
     @running = false unless fragShader.load(File.open(@frag_source, "r") {|f| f.read})
 
     @shaderProgram = Utils::ShaderProgram.new

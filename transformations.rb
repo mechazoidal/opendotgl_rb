@@ -53,10 +53,10 @@ class Transformations
     element_data_size = Fiddle::SIZEOF_INT * Elements.length
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo)
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, element_data_size, element_data_ptr, GL_STATIC_DRAW)
-    vertexShader = Utils::Shader.new(GL_VERTEX_SHADER)
+    vertexShader = Utils::Shader.new(:vertex)
     @running = false unless vertexShader.load(File.open(@vert_source, "r") {|f| f.read})
 
-    fragShader = Utils::Shader.new(GL_FRAGMENT_SHADER)
+    fragShader = Utils::Shader.new(:fragment)
     @running = false unless fragShader.load(File.open(@frag_source, "r") {|f| f.read})
 
     @shaderProgram = glCreateProgram()

@@ -34,10 +34,10 @@ class Triangle
     vertices_data_size = Fiddle::SIZEOF_FLOAT * vertices.flatten.length
     glBufferData(GL_ARRAY_BUFFER, vertices_data_size, vertices_data_ptr, GL_STATIC_DRAW)
 
-    vertexShader = Utils::Shader.new(GL_VERTEX_SHADER)
+    vertexShader = Utils::Shader.new(:vertex)
     @running = false unless vertexShader.load(File.open(VERT_SOURCE, "r") {|f| f.read})
 
-    fragShader = Utils::Shader.new(GL_FRAGMENT_SHADER)
+    fragShader = Utils::Shader.new(:fragment)
     @running = false unless fragShader.load(File.open(FRAG_SOURCE, "r") {|f| f.read})
 
     shaderProgram = glCreateProgram()
@@ -92,5 +92,5 @@ class Triangle
   end
 end
 
-window = Window.new(800, 600, "triangle", true)
+window = Window.new(800, 600, "triangle")
 Triangle.new.draw(window)

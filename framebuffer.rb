@@ -41,11 +41,13 @@ class Framebuffer
 
     # setup shaders
     @sceneShaderProgram = Utils::ShaderProgram.new
-    @sceneShaderProgram.create_from(File.open(scene_vertex_source, "r") {|f| f.read}, File.open(scene_frag_source, "r") {|f| f.read})
+    @sceneShaderProgram.create_from([[:vertex, File.open(scene_vertex_source, "r") {|f| f.read}], 
+                                     [:fragment, File.open(scene_frag_source, "r") {|f| f.read}]])
 
 
     @screenShaderProgram = Utils::ShaderProgram.new
-    @screenShaderProgram.create_from(File.open(screen_vertex_source, "r") {|f| f.read}, File.open(screen_frag_source, "r") {|f| f.read})
+    @screenShaderProgram.create_from([[:vertex, File.open(screen_vertex_source, "r") {|f| f.read}], 
+                                     [:fragment, File.open(screen_frag_source, "r") {|f| f.read}]])
     # end shader setup
 
     # Setup scene vertex attributes
