@@ -96,17 +96,11 @@ class Stencils
     fragShader = Utils::Shader.new(GL_FRAGMENT_SHADER)
     @running = false unless fragShader.load(File.open(@frag_source, "r") {|f| f.read})
 
-    #@shaderProgram = glCreateProgram()
     @shaderProgram = Utils::ShaderProgram.new
-    #glAttachShader(@shaderProgram, vertexShader.id)
     @shaderProgram.attach(vertexShader)
-    #glAttachShader(@shaderProgram, fragShader.id)
     @shaderProgram.attach(fragShader)
-    #glBindFragDataLocation(@shaderProgram, 0, "outColor")
-    @shaderProgram.bind("outColor")
+    @shaderProgram.bind_frag("outColor")
 
-    #glLinkProgram(@shaderProgram)
-    #glUseProgram(@shaderProgram)
     @shaderProgram.link_and_use
 
     @shaderProgram.enable_vertex_attrib("position", 3, :float, Vertices[0].length)
@@ -150,7 +144,6 @@ class Stencils
 
     # used for darkening the reflection color
     uniColor = @shaderProgram.uniform_location("overrideColor")
-    puts uniColor
 
     # Create initial model matrix
     # ( original used glm::mat4(1.0f) )
@@ -222,5 +215,5 @@ class Stencils
   end
 end
 
-window = Window.new(800, 600, "stencils", true)
+window = Window.new(800, 600, "stencils")
 Stencils.new(window).draw
