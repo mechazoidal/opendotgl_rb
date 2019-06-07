@@ -151,10 +151,9 @@ module Utils
       link
     end
 
-    # ex: [[:vertex, <source>], [:fragment, <source>]]
-    def create_from(shader_source_array)
-      shader_source_array.each {|s| load_and_attach(s[0], s[1])}
-      link
+    # ex: {vertex: <source>, fragment: <source>}
+    def load_from(shader_sources)
+      shader_sources.each_pair {|k,v| load_and_attach(k, v)}
     end
 
     def load_and_attach(type, shader_source)
@@ -385,10 +384,17 @@ module Utils
 
     # type is a symbol: :float, :int, etc.
     def load_buffer(data, type, mode=GL_STATIC_DRAW)
+      # FIXME pack command should vary by type
       data_ptr = Fiddle::Pointer[data.flatten.pack("F*")]
       data_size = fiddle_type(type) * data.flatten.length
       glBufferData(GL_ARRAY_BUFFER, data_size, data_ptr, mode)
       @loaded = true
+    end
+
+    # For transform buffers
+    def set_read_buffer(type, size)
+      data_size = fiddle_type(type) * size
+      glBufferData(GL_ARRAY_BUFFER, data_size, Utils::NullPtr, GL_STATIC_READ)
     end
   end
 
