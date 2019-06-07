@@ -17,6 +17,7 @@ end
 
 
 module Utils
+  extend Logging
   NullPtr = Fiddle::Pointer[0]
   SEVERITY = {OpenGL::GL_DEBUG_SEVERITY_HIGH => :high,
               OpenGL::GL_DEBUG_SEVERITY_MEDIUM => :medium,
@@ -34,7 +35,7 @@ module Utils
           OpenGL::GL_DEBUG_TYPE_PERFORMANCE => :performance}
 
   def self.check_errors( desc )
-    include Logging
+    #include Logging
     e = glGetError()
     if e != GL_NO_ERROR
       logger.error sprintf "glGetError: \"#{desc}\", code=0x%08x\n", e.to_i
@@ -43,7 +44,6 @@ module Utils
   end
 
   def self.gl_enable_debug_output
-
     closure = Class.new(Fiddle::Closure) {
 
       include Logging
@@ -56,8 +56,11 @@ module Utils
         end
       end
     }.new(Fiddle::TYPE_VOID, [Fiddle::TYPE_INT, Fiddle::TYPE_INT, Fiddle::TYPE_INT, Fiddle::TYPE_SIZE_T, Fiddle::TYPE_CHAR, Fiddle::TYPE_VOIDP])
-
+    
     glDebugMessageCallback(closure.to_i, NullPtr)
+  # TODO this should really rescue Fiddle::DLError, but I don't know if you can!
+  rescue RuntimeError # => exception
+    logger.warn("glDebugMessageCallback not available on this platform")
   end
 
   module RadianHelper
@@ -71,10 +74,6 @@ module Utils
   class Shader
     include Logging
 
-    #AttribTypes = {float: {gl: GL_FLOAT, pointer: Fiddle::SIZEOF_FLOAT}
-    #Types = {GL_VERTEX_SHADER   => :vertex,
-             #GL_FRAGMENT_SHADER => :fragment,
-             #GL_GEOMETRY_SHADER => :geometry}
     Types = {:vertex => OpenGL::GL_VERTEX_SHADER,
              :fragment => OpenGL::GL_FRAGMENT_SHADER,
              :geometry => OpenGL::GL_GEOMETRY_SHADER}
