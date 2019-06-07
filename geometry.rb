@@ -6,7 +6,6 @@ require "rmath3d/rmath3d"
 
 class Geometry
   include Logging
-  using Utils::RadianHelper
   def initialize(window)
     @window = window
     @name = "geometry"
