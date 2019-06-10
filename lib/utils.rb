@@ -1,6 +1,7 @@
 require 'logger'
 require 'fiddle'
 require 'opengl'
+require 'sdl2'
 
 # https://stackoverflow.com/questions/917566/ruby-share-logger-instance-among-module-classes
 module Logging
@@ -19,12 +20,14 @@ end
 module Utils
   extend Logging
   NullPtr = Fiddle::Pointer[0]
-  SEVERITY = {OpenGL::GL_DEBUG_SEVERITY_HIGH => :high,
+
+  # For use with glDebugMessageCallback
+  DEBUG_LOG_SEVERITY = {OpenGL::GL_DEBUG_SEVERITY_HIGH => :high,
               OpenGL::GL_DEBUG_SEVERITY_MEDIUM => :medium,
               OpenGL::GL_DEBUG_SEVERITY_LOW => :low,
               OpenGL::GL_DEBUG_SEVERITY_NOTIFICATION  => :notification}
 
-  TYPE = {OpenGL::GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR => :deprecated_behavior,
+  DEBUG_LOG_TYPE = {OpenGL::GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR => :deprecated_behavior,
           OpenGL::GL_DEBUG_TYPE_POP_GROUP => :pop_group,
           OpenGL::GL_DEBUG_TYPE_ERROR => :error,
           OpenGL::GL_DEBUG_TYPE_PORTABILITY => :portability,
@@ -34,12 +37,32 @@ module Utils
           OpenGL::GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR => :undefined_behavior,
           OpenGL::GL_DEBUG_TYPE_PERFORMANCE => :performance}
 
-  def self.check_errors( desc )
-    #include Logging
+  # For use with glGetError
+  GL_ERROR_TYPE = {
+    OpenGL::GL_NO_ERROR                      => :no_error,
+    OpenGL::GL_INVALID_ENUM                  => :invalid_enum,
+    OpenGL::GL_INVALID_VALUE                 => :invalid_value,
+    OpenGL::GL_INVALID_OPERATION             => :invalid_operation,
+    OpenGL::GL_INVALID_FRAMEBUFFER_OPERATION => :invalid_framebuffer_operation,
+    OpenGL::GL_OUT_OF_MEMORY                 => :out_of_memory,
+    OpenGL::GL_STACK_UNDERFLOW               => :stack_underflow,
+    OpenGL::GL_STACK_OVERFLOW                => :stack_overflow,
+    OpenGL::GL_CONTEXT_LOST                  => :context_lost }
+
+  # Provided as a fallback in case the platform is too old to use glDebugMessage
+  def self.gl_get_one_error
     e = glGetError()
     if e != GL_NO_ERROR
-      logger.error sprintf "glGetError: \"#{desc}\", code=0x%08x\n", e.to_i
-      exit
+      "glGetError: #{GL_ERROR_TYPE[e.to_i]}, from: #{caller[0]}"
+    else
+      nil
+    end
+  end
+
+  def self.gl_get_errors
+    e = glGetError()
+    while e != GL_NO_ERROR
+      logger.error "glGetError: #{GL_ERROR_TYPE[e.to_i]}, from: #{caller.join("\n")}"
     end
   end
 
@@ -48,7 +71,7 @@ module Utils
 
       include Logging
       def call(source, type, id, severity, length, message)
-        msg = "GL::#{SEVERITY[severity].to_s}::#{TYPE[type].to_s} -- #{message}"
+        msg = "GL::#{DEBUG_LOG_SEVERITY[severity].to_s}::#{DEBUG_LOG_TYPE[type].to_s} -- #{message}"
         if type == GL_DEBUG_TYPE_ERROR
           logger.error(msg)
         else
@@ -180,12 +203,12 @@ module Utils
                               GL_FALSE,     # normalized?
                               fiddle_type(type) * stride,
                               # Yes, the offset is weird(an offset void* pointer)
-                              # Blame the OpenGL ARB
+                              # Blame the OpenGL ARB!
                               Utils::NullPtr + fiddle_type(type) * offset # A void* ptr
                              )
         enableAttrib
       else
-        logger.info("shader vertex attribute '#{name}' was requested but not found(probably stripped/unused")
+        logger.info("shader vertex attribute '#{name}' was requested but not found(probably stripped/unused by driver)")
         nil
       end
     end
@@ -208,7 +231,7 @@ module Utils
       begin
         Object.const_get("Fiddle::SIZEOF_#{type_name.to_s.upcase}")
       rescue NameError
-        logger.info("fiddle_type: '#{type_name}' does not match a Fiddle::SIZEOF_ constant")
+        logger.error("fiddle_type: '#{type_name}' does not match a Fiddle::SIZEOF_ constant")
         return nil
       end
     end
@@ -258,7 +281,7 @@ module Utils
       image = SDL2::Surface.load(filename)
       image_ptr = Fiddle::Pointer[image.pixels]
       mode = image.bytes_per_pixel == 4 ? GL_RGBA : GL_RGB
-      glTexImage2D(GL_TEXTURE_2D, 0, mode, image.w, image.h, 0, GL_RGB, GL_UNSIGNED_BYTE, image_ptr)
+      glTexImage2D(GL_TEXTURE_2D, 0, mode, image.w, image.h, 0, mode, GL_UNSIGNED_BYTE, image_ptr)
       image.destroy
       # TODO do I need to reset glActiveTexture back to 0 ?
       @slots << name
@@ -411,6 +434,7 @@ module Utils
       buf = Fiddle::Pointer.malloc(Fiddle::SIZEOF_INT)
       glGenFramebuffers(1, buf)
       @id = buf[0, Fiddle::SIZEOF_INT].unpack('L')[0]
+      logger.debug status
     end
 
     def bind
