@@ -218,5 +218,5 @@ class Framebuffer
   end
 end
 
-window = Window.new(800, 600, "framebuffer", true)
+window = Window.new(800, 600, "framebuffer")
 Framebuffer.new(window).draw
