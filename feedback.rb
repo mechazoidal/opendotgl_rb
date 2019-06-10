@@ -96,14 +96,16 @@ class Feedback
     # Vertex format: 6 floats per vertex:
     # pos.x  pox.y  vel.x  vel.y  origPos.x  origPos.y
     data = Array.new(600) {0.0}
-    10.times do |y|
-      10.times do |x|
+    9.times do |y|
+      9.times do |x|
         data[60 * y + 6 * x] = 0.2 * x - 0.9
         data[60 * y + 6 * x + 1] = 0.2 * y - 0.9
         data[60 * y + 6 * x + 4] = 0.2 * x - 0.9
         data[60 * y + 6 * x + 5] = 0.2 * y - 0.9
       end
     end
+
+    data_size = Fiddle::SIZEOF_FLOAT * data.length
 
     vbo = Utils::VertexBuffer.new
     vbo.bind
@@ -116,7 +118,9 @@ class Feedback
     tbo = Utils::VertexBuffer.new
     tbo.set_read_buffer(:float, 400)
     glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, tbo.id)
-    feedback = Fiddle::Pointer.malloc(Fiddle::SIZEOF_FLOAT * 400)
+    #feedback = Array.new(400) {0.0}
+    feedback_length = 400
+    feedback = Fiddle::Pointer.malloc(Fiddle::SIZEOF_FLOAT * feedback_length)
     vbo.bind
 
     glPointSize(5.0)
@@ -162,18 +166,24 @@ class Feedback
       glBeginTransformFeedback(GL_POINTS)
 
       glDrawArrays(GL_POINTS, 0, 100)
+
       glEndTransformFeedback()
       glEndQuery(GL_TIME_ELAPSED)
       @window.window.gl_swap
+
       # get results back
       #data_size = vbo.fiddle_type(:float) * data.length * 3
-      data_size = Fiddle::SIZEOF_FLOAT * data.length
-      feedback = Fiddle::Pointer.malloc(data_size)
-      glGetBufferSubData(GL_TRANSFORM_FEEDBACK_BUFFER, Utils::NullPtr, data_size, feedback)
-      response = feedback[0, data_size].unpack('F*')
+      #data_size = Fiddle::SIZEOF_FLOAT * data.length
+      #data_size = Fiddle::SIZEOF_FLOAT * feedback.length
+      feedback_size = Fiddle::SIZEOF_FLOAT * feedback_length
+      #feedback = Fiddle::Pointer.malloc(data_size)
+      #feedback_ptr = Fiddle::Pointer[feedback]
+      #glGetBufferSubData(GL_TRANSFORM_FEEDBACK_BUFFER, Utils::NullPtr, data_size, feedback_ptr)
+      glGetBufferSubData(GL_TRANSFORM_FEEDBACK_BUFFER, Utils::NullPtr, feedback_size, feedback)
+      response = feedback[0, feedback_size].unpack('F*')
 
       # FIXME optimize
-      100.times do |i|
+      99.times do |i|
         data[6 * i] = response[4 * i]
         data[6 * i + 1] = response[4 * i + 1]
         data[6 * i + 2] = response[4 * i + 2]
@@ -189,7 +199,7 @@ class Feedback
       time_buf = Fiddle::Pointer.malloc(Fiddle::SIZEOF_INT)
       glGetQueryObjectuiv(query, GL_QUERY_RESULT, time_buf)
       time_elapsed = time_buf[0, Fiddle::SIZEOF_INT].unpack('L*')[0]
-      puts time_elapsed.inspect
+      #puts time_elapsed.inspect
     end
   end
 end
