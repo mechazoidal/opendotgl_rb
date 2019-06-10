@@ -187,8 +187,10 @@ class Textures
     image = SDL2::Surface.load('sample_earth.png')
     image_ptr = Fiddle::Pointer[image.pixels]
     mode = image.bytes_per_pixel == 4 ? GL_RGBA : GL_RGB
-    glTexImage2D(GL_TEXTURE_2D, 0, mode, image.w, image.h, 0, GL_RGB, GL_UNSIGNED_BYTE, image_ptr)
+    #logger.debug image.bytes_per_pixel
+    glTexImage2D(GL_TEXTURE_2D, 0, mode, image.w, image.h, 0, mode, GL_UNSIGNED_BYTE, image_ptr)
     image.destroy
+    Utils.gl_get_errors
 
     #x,y,z = s,t,r in textures
     #set clamping for s and t coordinates
@@ -199,6 +201,7 @@ class Textures
     #Specify interpolation for scaling up/down*/
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+    Utils.gl_get_errors
 
     while @running
       event = SDL2::Event.poll
@@ -239,12 +242,13 @@ class Textures
     image = SDL2::Surface.load(filename)
     image_ptr = Fiddle::Pointer[image.pixels]
     mode = image.bytes_per_pixel == 4 ? GL_RGBA : GL_RGB
-    glTexImage2D(GL_TEXTURE_2D, 0, mode, image.w, image.h, 0, GL_RGB, GL_UNSIGNED_BYTE, image_ptr)
+    glTexImage2D(GL_TEXTURE_2D, 0, mode, image.w, image.h, 0, mode, GL_UNSIGNED_BYTE, image_ptr)
     image.destroy
 
     uni_buf = glGetUniformLocation(@shaderProgram, name)
     logger.debug {"attribute #{name} location: #{uni_buf.inspect}"}
     glUniform1i(uni_buf, slot)
+    Utils.gl_get_errors
     nil
   end
 
@@ -255,6 +259,7 @@ class Textures
 
     load_texture('sample_earth.png', 'texEarth', 0, tex[0])
     load_texture('sample_moon.png', 'texMoon', 1, tex[1])
+    Utils.gl_get_errors
 
     while @running
       event = SDL2::Event.poll
@@ -272,6 +277,7 @@ class Textures
       glClear(GL_COLOR_BUFFER_BIT)
 
       glDrawElements(GL_TRIANGLES, Elements.length, GL_UNSIGNED_INT, 0)
+    Utils.gl_get_errors
 
       @window.window.gl_swap
     end
