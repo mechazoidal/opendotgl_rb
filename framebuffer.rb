@@ -7,9 +7,11 @@ require "rmath3d/rmath3d"
 class Framebuffer
   include Logging
   using Utils::RadianHelper
+
   def initialize(window)
     @window = window
     @name = "framebuffer"
+
     scene_vertex_source = File.join("shaders", @name, "sceneVertex.glsl")
     scene_frag_source = File.join("shaders", @name, "sceneFragment.glsl")
 
@@ -41,13 +43,13 @@ class Framebuffer
 
     # setup shaders
     @sceneShaderProgram = Utils::ShaderProgram.new
-    @sceneShaderProgram.create_from([[:vertex, File.open(scene_vertex_source, "r") {|f| f.read}], 
-                                     [:fragment, File.open(scene_frag_source, "r") {|f| f.read}]])
+    @sceneShaderProgram.load_from({vertex: File.open(scene_vertex_source, "r") {|f| f.read}, 
+                                     fragment: File.open(scene_frag_source, "r") {|f| f.read}})
 
 
     @screenShaderProgram = Utils::ShaderProgram.new
-    @screenShaderProgram.create_from([[:vertex, File.open(screen_vertex_source, "r") {|f| f.read}], 
-                                     [:fragment, File.open(screen_frag_source, "r") {|f| f.read}]])
+    @screenShaderProgram.load_from({vertex: File.open(screen_vertex_source, "r") {|f| f.read}, 
+                                    fragment: File.open(screen_frag_source, "r") {|f| f.read}})
     # end shader setup
 
     # Setup scene vertex attributes
@@ -94,6 +96,7 @@ class Framebuffer
     glBindRenderbuffer(GL_RENDERBUFFER, rboDepthStencil);
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, @window.width, @window.height);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rboDepthStencil)
+
 
     # with RenderBuffer this collapses into:
     #@rboDepthStencil = Utils::RenderBuffer.new
@@ -215,5 +218,5 @@ class Framebuffer
   end
 end
 
-window = Window.new(800, 600, "framebuffer")
+window = Window.new(800, 600, "framebuffer", true)
 Framebuffer.new(window).draw
