@@ -45,11 +45,13 @@ class Framebuffer
     @sceneShaderProgram = Utils::ShaderProgram.new
     @sceneShaderProgram.load_from({vertex: File.open(scene_vertex_source, "r") {|f| f.read}, 
                                      fragment: File.open(scene_frag_source, "r") {|f| f.read}})
-
+    @sceneShaderProgram.bind_frag("outColor")
+    @sceneShaderProgram.link
 
     @screenShaderProgram = Utils::ShaderProgram.new
     @screenShaderProgram.load_from({vertex: File.open(screen_vertex_source, "r") {|f| f.read}, 
                                     fragment: File.open(screen_frag_source, "r") {|f| f.read}})
+    @screenShaderProgram.link
     # end shader setup
 
     # Setup scene vertex attributes
@@ -58,7 +60,6 @@ class Framebuffer
     @sceneShaderProgram.enable_vertex_attrib("position", 3, :float, 8)
     @sceneShaderProgram.enable_vertex_attrib("color",    3, :float, 8, 3)
     @sceneShaderProgram.enable_vertex_attrib("texcoord", 2, :float, 8, 6)
-    @sceneShaderProgram.bind_frag("outColor")
 
     # Setup screen vertex attributes
     @vaoQuad.bind
@@ -131,7 +132,7 @@ class Framebuffer
     glUniformMatrix4fv(uniProj, 1, GL_FALSE, Fiddle::Pointer[proj.to_a.pack('F*')])
 
     uniColor = @sceneShaderProgram.uniform_location("overrideColor")
-    start_time = SDL2::get_ticks / 1000.0
+    start_time = Time.now
     # Create initial model matrix
     model = RMath3D::RMtx4.new.setIdentity
     scaling = RMath3D::RMtx4.new.scaling(1.0, 1.0, -1.0)
@@ -161,8 +162,8 @@ class Framebuffer
       glClearColor(1.0, 1.0, 1.0, 1.0)
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
-      current_time = SDL2::get_ticks / 1000.0
-      time = (current_time - start_time)
+      now = Time.now 
+      time = (now - start_time)
 
       # Calculate new rotation
       model = model.rotationAxis(RMath3D::RVec3.new(0.0, 0.0, 1.0),
@@ -218,5 +219,5 @@ class Framebuffer
   end
 end
 
-window = Window.new(800, 600, "framebuffer")
+window = Window.new(800, 600, "framebuffer", true)
 Framebuffer.new(window).draw
