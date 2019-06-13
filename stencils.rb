@@ -118,7 +118,6 @@ class Stencils
 
   def draw
     start_time = Time.now
-    #SDL2::get_ticks / 1000.0
 
     uniModel = @shaderProgram.uniform_location("model")
 
