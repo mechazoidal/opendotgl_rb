@@ -284,8 +284,7 @@ class Textures
   end
 
   def draw_anim_blend_texture
-    start_time = SDL2::get_ticks / 1000.0
-    current_time = 0.0
+    start_time = Time.now
     tex_buf = Fiddle::Pointer.malloc(Fiddle::SIZEOF_INT * 2)
     glGenTextures(2, tex_buf)
     tex = [tex_buf[0, Fiddle::SIZEOF_INT].unpack('L')[0], tex_buf[Fiddle::SIZEOF_INT, Fiddle::SIZEOF_INT*2].unpack('L')[0]]
@@ -312,7 +311,7 @@ class Textures
       glClearColor(0.0, 0.0, 0.0, 1.0)
       glClear(GL_COLOR_BUFFER_BIT)
 
-      current_time = SDL2::get_ticks / 1000.0
+      current_time = Time.now
       time = (current_time - start_time)
       glUniform1f(uni_time, time)
       glDrawElements(GL_TRIANGLES, Elements.length, GL_UNSIGNED_INT, 0)

@@ -117,7 +117,8 @@ class Stencils
   end
 
   def draw
-    start_time = SDL2::get_ticks / 1000.0
+    start_time = Time.now
+    #SDL2::get_ticks / 1000.0
 
     uniModel = @shaderProgram.uniform_location("model")
 
@@ -168,7 +169,7 @@ class Stencils
       glClearColor(1.0, 1.0, 1.0, 1.0)
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
-      current_time = SDL2::get_ticks / 1000.0
+      current_time = Time.now
       time = (current_time - start_time)
 
       # Calculate new rotation

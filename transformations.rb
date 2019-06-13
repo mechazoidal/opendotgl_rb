@@ -130,7 +130,7 @@ class Transformations
                                               10.0) # zfar
 
 
-    start_time = SDL2::get_ticks / 1000.0
+    start_time = Time.now
 
     # Send view and proj matrix variables to shader (which will not change per-frame)
     glUniformMatrix4fv(uniView, 1, GL_FALSE,  Fiddle::Pointer[view.to_a.pack('F*')])
@@ -154,8 +154,8 @@ class Transformations
       glClearColor(0.0, 0.0, 0.0, 1.0)
       glClear(GL_COLOR_BUFFER_BIT)
 
-      current_time = SDL2::get_ticks / 1000.0
-      time = (current_time - start_time)
+      now = Time.now
+      time = (now - start_time)
 
       # Calculate new rotation
       model = model.rotationAxis(RMath3D::RVec3.new(0.0, 0.0, 1.0),
