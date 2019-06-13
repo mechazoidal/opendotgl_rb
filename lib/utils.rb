@@ -21,6 +21,9 @@ module Utils
   extend Logging
   NullPtr = Fiddle::Pointer[0]
 
+  # Used for Fiddle malloc'd pointers, to prevent Ruby GC from cleaning them up.
+  FreeFunction = Fiddle::Function.new(Fiddle::RUBY_FREE, [Fiddle::TYPE_VOIDP], Fiddle::TYPE_VOID)
+
   # For use with glDebugMessageCallback
   DEBUG_LOG_SEVERITY = {OpenGL::GL_DEBUG_SEVERITY_HIGH => :high,
               OpenGL::GL_DEBUG_SEVERITY_MEDIUM => :medium,
@@ -414,9 +417,9 @@ module Utils
     end
 
     # For transform buffers
-    def set_read_buffer(type, size)
-      data_size = fiddle_type(type) * size
-      glBufferData(GL_ARRAY_BUFFER, data_size, Utils::NullPtr, GL_STATIC_READ)
+    def set_read_buffer(data_type, size, gl_type=GL_STATIC_READ)
+      data_size = fiddle_type(data_type) * size
+      glBufferData(GL_ARRAY_BUFFER, data_size, Utils::NullPtr, gl_type)
     end
   end
 
