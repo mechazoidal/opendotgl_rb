@@ -1,17 +1,29 @@
 require_relative './lib/window'
 require_relative './lib/utils'
 
-
 class Rectangle
-  def draw(window)
+  VERTICES = [
+    # Top-left
+    [-0.5,  0.5, 1.0, 0.0, 0.0],
+    # Top-right
+    [ 0.5,  0.5, 0.0, 1.0, 0.0],
+    # Bottom-right
+    [ 0.5, -0.5, 0.0, 0.0, 1.0],
+    # Bottom-left
+    [-0.5, -0.5, 1.0, 1.0, 1.0]
+  ].freeze
+  # vertices_gray = vertices.map {|n| n[0..1]}
+  ELEMENTS = [
+    0, 1, 2,
+    2, 3, 0
+  ].freeze
+  def initialize(window)
+    @window = window
+    @name = 'rectangle'
+  end
+
+  def draw
     @running = true
-    vertices = [
-      [ -0.5,  0.5, 1.0, 0.0, 0.0 ], # Top-left
-      [  0.5,  0.5, 0.0, 1.0, 0.0 ], # Top-right
-      [  0.5, -0.5, 0.0, 0.0, 1.0 ], # Bottom-right
-      [ -0.5, -0.5, 1.0, 1.0, 1.0 ], # Bottom-left
-    ]
-    #vertices_gray = vertices.map {|n| n[0..1]}
 
     # Create VAO
     vao_buf = Fiddle::Pointer.malloc(Fiddle::SIZEOF_INT)
@@ -24,59 +36,58 @@ class Rectangle
     vbo = vbo_buf[0, Fiddle::SIZEOF_INT].unpack('L')[0]
     glBindBuffer(GL_ARRAY_BUFFER, vbo)
 
-    elements = [
-      0, 1, 2,
-      2, 3, 0
-    ]
     # setup vertex element buffers
-
     ebo_buf = Fiddle::Pointer.malloc(Fiddle::SIZEOF_INT)
     glGenBuffers(1, ebo_buf)
     ebo = ebo_buf[0, Fiddle::SIZEOF_INT].unpack('L')[0]
-    element_data_ptr = Fiddle::Pointer[elements.pack("i*")]
-    element_data_size = Fiddle::SIZEOF_INT * elements.length
+    element_data_ptr = Fiddle::Pointer[ELEMENTS.pack('i*')]
+    element_data_size = Fiddle::SIZEOF_INT * ELEMENTS.length
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo)
 
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, element_data_size, element_data_ptr, GL_STATIC_DRAW)
 
     # Upload vertices once, draw them many
-    vertices_data_ptr = Fiddle::Pointer[vertices.flatten.pack("F*")]
-    vertices_data_size = Fiddle::SIZEOF_FLOAT * vertices.flatten.length
+    vertices_data_ptr = Fiddle::Pointer[VERTICES.flatten.pack('F*')]
+    vertices_data_size = Fiddle::SIZEOF_FLOAT * VERTICES.flatten.length
     glBufferData(GL_ARRAY_BUFFER, vertices_data_size, vertices_data_ptr, GL_STATIC_DRAW)
 
-    vertexShader = Utils::Shader.new(:vertex)
-    @running = false unless vertexShader.load(File.open("shaders/rectangle/rectangle_vert_shader.glsl", "r") {|f| f.read})
+    vertex_shader = Utils::Shader.new(:vertex)
+    @running = false unless vertex_shader.load(File.open('shaders/rectangle/rectangle_vert_shader.glsl', 'r', &:read))
 
-    fragShader = Utils::Shader.new(:fragment)
-    @running = false unless fragShader.load(File.open("shaders/rectangle/rectangle_frag_shader.glsl", "r") {|f| f.read})
+    frag_shader = Utils::Shader.new(:fragment)
+    @running = false unless frag_shader.load(File.open('shaders/rectangle/rectangle_frag_shader.glsl', 'r', &:read))
 
-    shaderProgram = glCreateProgram()
-    glAttachShader(shaderProgram, vertexShader.id)
-    glAttachShader(shaderProgram, fragShader.id)
+    shader_program = glCreateProgram()
+    glAttachShader(shader_program, vertex_shader.id)
+    glAttachShader(shader_program, frag_shader.id)
 
-    glLinkProgram(shaderProgram)
-    glUseProgram(shaderProgram)
+    glLinkProgram(shader_program)
+    glUseProgram(shader_program)
 
-    posAttrib = glGetAttribLocation(shaderProgram, "position")
-    glEnableVertexAttribArray(posAttrib)
-    glVertexAttribPointer(posAttrib,                # location
-                          2,                        # size
-                          GL_FLOAT,                 # type
-                          GL_FALSE,                 # normalized?
-                          Fiddle::SIZEOF_FLOAT * vertices[0].length, # stride: 5 items in each vertex(x,y,r,g,b)
-                          0        # no offset required
-                         )
+    position_attribute = glGetAttribLocation(shader_program, 'position')
+    glEnableVertexAttribArray(position_attribute)
+    glVertexAttribPointer(position_attribute,
+                          # size: 2 (x, y)
+                          2,
+                          # type
+                          GL_FLOAT,
+                          # normalized?
+                          GL_FALSE,
+                          # stride: 5 items in each vertex(x, y, r, g, b)
+                          Fiddle::SIZEOF_FLOAT * VERTICES[0].length,
+                          # no offset required
+                          0)
 
-    colAttrib = glGetAttribLocation(shaderProgram, "color")
-    glEnableVertexAttribArray(colAttrib)
+    color_attribute = glGetAttribLocation(shader_program, 'color')
+    glEnableVertexAttribArray(color_attribute)
 
-    glVertexAttribPointer(colAttrib,
+    glVertexAttribPointer(color_attribute,
                           3,
                           GL_FLOAT,
                           GL_FALSE,
-                          Fiddle::SIZEOF_FLOAT * vertices[0].length,
-                          (Fiddle::Pointer[0] + Fiddle::SIZEOF_FLOAT * 2) # "Offset" pointer: space for 2 floats, cast to void*
-                         )
+                          Fiddle::SIZEOF_FLOAT * VERTICES[0].length,
+                          # Offset: space for 2 floats, cast to void*
+                          (Utils::NullPtr + Fiddle::SIZEOF_FLOAT * 2))
 
     while @running
       event = SDL2::Event.poll
@@ -92,17 +103,12 @@ class Rectangle
 
       glClearColor(0.0, 0.0, 0.0, 1.0)
       glClear(GL_COLOR_BUFFER_BIT)
-      glDrawElements(GL_TRIANGLES, elements.length, GL_UNSIGNED_INT, 0)
+      glDrawElements(GL_TRIANGLES, ELEMENTS.length, GL_UNSIGNED_INT, 0)
 
-      window.window.gl_swap
+      @window.window.gl_swap
     end
-    # TODO proper cleanup
-    #shader.delete
-    glDeleteProgram(shaderProgram)
-    #glDeleteBuffers(1, vbo.pack('L'))
-    #glDeleteVertexArrays(1, Fiddle::Pointer[vao])
   end
 end
 
-window = Window.new(800, 600, "rectangle")
-Rectangle.new.draw(window)
+window = Window.new(800, 600, 'rectangle')
+Rectangle.new(window).draw

@@ -1,5 +1,5 @@
-require 'logger'
 require 'fiddle'
+require 'logger'
 require 'opengl'
 require 'sdl2'
 
@@ -16,29 +16,29 @@ module Logging
   end
 end
 
-
 module Utils
   extend Logging
   NullPtr = Fiddle::Pointer[0]
 
-  # Used for Fiddle malloc'd pointers, to prevent Ruby GC from cleaning them up.
-  FreeFunction = Fiddle::Function.new(Fiddle::RUBY_FREE, [Fiddle::TYPE_VOIDP], Fiddle::TYPE_VOID)
-
   # For use with glDebugMessageCallback
-  DEBUG_LOG_SEVERITY = {OpenGL::GL_DEBUG_SEVERITY_HIGH => :high,
-              OpenGL::GL_DEBUG_SEVERITY_MEDIUM => :medium,
-              OpenGL::GL_DEBUG_SEVERITY_LOW => :low,
-              OpenGL::GL_DEBUG_SEVERITY_NOTIFICATION  => :notification}
+  DEBUG_LOG_SEVERITY = {
+    OpenGL::GL_DEBUG_SEVERITY_HIGH          => :high,
+    OpenGL::GL_DEBUG_SEVERITY_MEDIUM        => :medium,
+    OpenGL::GL_DEBUG_SEVERITY_LOW           => :low,
+    OpenGL::GL_DEBUG_SEVERITY_NOTIFICATION  => :notification
+  }.freeze
 
-  DEBUG_LOG_TYPE = {OpenGL::GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR => :deprecated_behavior,
-          OpenGL::GL_DEBUG_TYPE_POP_GROUP => :pop_group,
-          OpenGL::GL_DEBUG_TYPE_ERROR => :error,
-          OpenGL::GL_DEBUG_TYPE_PORTABILITY => :portability,
-          OpenGL::GL_DEBUG_TYPE_MARKER => :marker,
-          OpenGL::GL_DEBUG_TYPE_PUSH_GROUP => :push_group,
-          OpenGL::GL_DEBUG_TYPE_OTHER => :other,
-          OpenGL::GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR => :undefined_behavior,
-          OpenGL::GL_DEBUG_TYPE_PERFORMANCE => :performance}
+  DEBUG_LOG_TYPE = {
+    OpenGL::GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR => :deprecated_behavior,
+    OpenGL::GL_DEBUG_TYPE_POP_GROUP           => :pop_group,
+    OpenGL::GL_DEBUG_TYPE_ERROR               => :error,
+    OpenGL::GL_DEBUG_TYPE_PORTABILITY         => :portability,
+    OpenGL::GL_DEBUG_TYPE_MARKER              => :marker,
+    OpenGL::GL_DEBUG_TYPE_PUSH_GROUP          => :push_group,
+    OpenGL::GL_DEBUG_TYPE_OTHER               => :other,
+    OpenGL::GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR  => :undefined_behavior,
+    OpenGL::GL_DEBUG_TYPE_PERFORMANCE         => :performance
+  }.freeze
 
   # For use with glGetError
   GL_ERROR_TYPE = {
@@ -50,15 +50,14 @@ module Utils
     OpenGL::GL_OUT_OF_MEMORY                 => :out_of_memory,
     OpenGL::GL_STACK_UNDERFLOW               => :stack_underflow,
     OpenGL::GL_STACK_OVERFLOW                => :stack_overflow,
-    OpenGL::GL_CONTEXT_LOST                  => :context_lost }
+    OpenGL::GL_CONTEXT_LOST                  => :context_lost
+  }.freeze
 
   # Provided as a fallback in case the platform is too old to use glDebugMessage
   def self.gl_get_one_error
     e = glGetError()
     if e != GL_NO_ERROR
-      "glGetError: #{GL_ERROR_TYPE[e.to_i]}, from: #{caller[0]}"
-    else
-      nil
+      "glGetError: #{GL_ERROR_TYPE[e.to_i]}, from: #{caller(1..1).first}"
     end
   end
 
@@ -70,23 +69,28 @@ module Utils
   end
 
   def self.gl_enable_debug_output
-    closure = Class.new(Fiddle::Closure) {
-
+    closure = Class.new(Fiddle::Closure) do
       include Logging
-      def call(source, type, id, severity, length, message)
-        msg = "GL::#{DEBUG_LOG_SEVERITY[severity].to_s}::#{DEBUG_LOG_TYPE[type].to_s} -- #{message}"
+      def call(_source, type, _id, severity, _length, message)
+        msg = "GL::#{DEBUG_LOG_SEVERITY[severity]}::#{DEBUG_LOG_TYPE[type]} -- #{message}"
         if type == GL_DEBUG_TYPE_ERROR
           logger.error(msg)
         else
           logger.debug(msg)
         end
       end
-    }.new(Fiddle::TYPE_VOID, [Fiddle::TYPE_INT, Fiddle::TYPE_INT, Fiddle::TYPE_INT, Fiddle::TYPE_SIZE_T, Fiddle::TYPE_CHAR, Fiddle::TYPE_VOIDP])
-    
+    end.new(Fiddle::TYPE_VOID,
+            [Fiddle::TYPE_INT,
+             Fiddle::TYPE_INT,
+             Fiddle::TYPE_INT,
+             Fiddle::TYPE_SIZE_T,
+             Fiddle::TYPE_CHAR,
+             Fiddle::TYPE_VOIDP])
+
     glDebugMessageCallback(closure.to_i, NullPtr)
-  # TODO this should really rescue Fiddle::DLError, but I don't know if you can!
+  # TODO: this should really rescue Fiddle::DLError, but I don't know if you can!
   rescue RuntimeError # => exception
-    logger.warn("glDebugMessageCallback not available on this platform")
+    logger.warn('glDebugMessageCallback not available on this platform')
   end
 
   module RadianHelper
@@ -100,45 +104,42 @@ module Utils
   class Shader
     include Logging
 
-    Types = {:vertex => OpenGL::GL_VERTEX_SHADER,
-             :fragment => OpenGL::GL_FRAGMENT_SHADER,
-             :geometry => OpenGL::GL_GEOMETRY_SHADER}
+    TYPES = {vertex:   OpenGL::GL_VERTEX_SHADER,
+             fragment: OpenGL::GL_FRAGMENT_SHADER,
+             geometry: OpenGL::GL_GEOMETRY_SHADER}.freeze
 
     attr_reader :id
     def initialize(type = :vertex)
-      @id = glCreateShader(Types[type])
+      @id = glCreateShader(TYPES[type])
     end
 
-
     def load(source)
-      status = GL_FALSE
       src = [source].pack('p')
       length = [source.length].pack('I')
       glShaderSource(@id, 1, src, length)
       glCompileShader(@id)
       # make sure it compiled
       result_buf = ' ' * 4
-      glGetShaderiv(@id, GL_COMPILE_STATUS, result_buf);
+      glGetShaderiv(@id, GL_COMPILE_STATUS, result_buf)
       status = result_buf.unpack('L')[0] # GLint
       if status == GL_FALSE
-        logger.error "Failed to compile shader"
+        logger.error 'Failed to compile shader'
         log_buffer = ' ' * 4
-        glGetShaderiv(@id, GL_COMPILE_STATUS, log_buffer);
+        glGetShaderiv(@id, GL_COMPILE_STATUS, log_buffer)
         log_length = log_buffer.unpack('L')[0]
         log = ' ' * log_length
         glGetShaderInfoLog(@id, log_length, Fiddle::Pointer[0], log)
         # TODO if we're in a debug context, we may not get output here and it may have gone straight to debug console
         logger.error log
       end
-      status == GL_TRUE ? true : false
+      status == GL_TRUE
     end
-
   end
 
   # TODO should have a overall Shader object keeping track of which ShaderProgram is in use
   class ShaderProgram
     include Logging
-    attr_reader :id, :linked #, :in_use
+    attr_reader :id, :linked
     def initialize
       @id = glCreateProgram()
       @attached = []
@@ -196,20 +197,21 @@ module Utils
 
     # TODO should probably take hash args
     def enable_vertex_attrib(name, size, type, stride, offset=0)
-      enableAttrib = glGetAttribLocation(@id, name)
-      if enableAttrib != -1
-        glEnableVertexAttribArray(enableAttrib)
-        logger.debug "enabling vertex attrib array for '#{name}'(#{enableAttrib}): size: #{size}, type: #{type.to_s}, stride: #{stride}, offset: #{offset}"
-        glVertexAttribPointer(enableAttrib, # location
+      vertex_attribute = glGetAttribLocation(@id, name)
+      if vertex_attribute != -1
+        glEnableVertexAttribArray(vertex_attribute)
+        logger.debug "enabling vertex attrib array for '#{name}'(#{vertex_attribute}): size: #{size}, type: #{type.to_s}, stride: #{stride}, offset: #{offset}"
+        glVertexAttribPointer(vertex_attribute,
                               size,
                               gl_type(type),
-                              GL_FALSE,     # normalized?
+                              # normalized?
+                              GL_FALSE,
                               fiddle_type(type) * stride,
-                              # Yes, the offset is weird(an offset void* pointer)
-                              # Blame the OpenGL ARB!
-                              Utils::NullPtr + fiddle_type(type) * offset # A void* ptr
+                              # Yes, setting the offset is weird(an offset void* pointer)
+                              # Blame the OpenGL ARB and backwards-compatibility hacks!
+                              Utils::NullPtr + fiddle_type(type) * offset
                              )
-        enableAttrib
+        vertex_attribute
       else
         logger.info("shader vertex attribute '#{name}' was requested but not found(probably stripped/unused by driver)")
         nil
@@ -218,7 +220,6 @@ module Utils
 
     def uniform_location(name)
       glGetUniformLocation(@id, name)
-
     end
 
     def gl_type(type_name)
@@ -271,13 +272,11 @@ module Utils
       logger.debug {"load_texture: loading #{filename} to name #{name} to buffer #{tex_slot}, unit GL_TEXTURE#{slot}"}
       glBindTexture(GL_TEXTURE_2D, tex_slot)
 
-      #x,y,z = s,t,r in textures
-      #set clamping for s and t coordinates
-
+      # set clamping for s and t coordinates
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
 
-      #Specify interpolation for scaling up/down*/
+      # Specify interpolation for scaling up/down*/
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
 
@@ -415,23 +414,19 @@ module Utils
       glBufferData(GL_ARRAY_BUFFER, data_size, data_ptr, mode)
       @loaded = true
     end
-
-    # For transform buffers
-    def set_read_buffer(data_type, size, gl_type=GL_STATIC_READ)
-      data_size = fiddle_type(data_type) * size
-      glBufferData(GL_ARRAY_BUFFER, data_size, Utils::NullPtr, gl_type)
-    end
   end
 
   class FrameBuffer
     include Logging
     attr_reader :id
-    StatusValues = {OpenGL::GL_FRAMEBUFFER_COMPLETE => :complete,
-              OpenGL::GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT => :incomplete_attachment,
-              OpenGL::GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT => :incomplete_missing_attachment,
-              OpenGL::GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER => :incomplete_draw_buffer,
-              OpenGL::GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER => :incomplete_read_buffer,
-              OpenGL::GL_FRAMEBUFFER_UNSUPPORTED => :unsupported}
+    STATUS_VALUES = {
+      OpenGL::GL_FRAMEBUFFER_COMPLETE => :complete,
+      OpenGL::GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT => :incomplete_attachment,
+      OpenGL::GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT => :incomplete_missing_attachment,
+      OpenGL::GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER => :incomplete_draw_buffer,
+      OpenGL::GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER => :incomplete_read_buffer,
+      OpenGL::GL_FRAMEBUFFER_UNSUPPORTED => :unsupported
+    }.freeze
 
     def initialize
       buf = Fiddle::Pointer.malloc(Fiddle::SIZEOF_INT)
@@ -445,7 +440,7 @@ module Utils
     end
 
     def status
-      StatusValues[glCheckFramebufferStatus(GL_FRAMEBUFFER)]
+      STATUS_VALUES[glCheckFramebufferStatus(GL_FRAMEBUFFER)]
     end
 
     def complete?
@@ -454,9 +449,11 @@ module Utils
 
     def texture2D(texBuffer)
       # TODO need a slot list at some point
-      glFramebufferTexture2D(
-          GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texBuffer, 0
-      )
+      glFramebufferTexture2D(GL_FRAMEBUFFER,
+                             GL_COLOR_ATTACHMENT0,
+                             GL_TEXTURE_2D,
+                             texBuffer,
+                             0)
 
     end
   end
@@ -476,7 +473,7 @@ module Utils
     end
 
     def set_storage(type, width, height)
-      glRenderbufferStorage(GL_RENDERBUFFER, type, width, height);
+      glRenderbufferStorage(GL_RENDERBUFFER, type, width, height)
     end
 
     def set_framebuffer(type)

@@ -2,16 +2,15 @@ require_relative './lib/utils'
 require_relative './lib/window'
 
 class Triangle
-  NAME = "triangle"
-  #VERT_SHADER = "solid_vert.glsl"
-  #FRAG_SHADER = "solid_frag.glsl"
-  VERT_SHADER = "triangle_vert_shader.glsl"
-  FRAG_SHADER = "triangle_frag_shader.glsl"
-  VERT_SOURCE = File.join("shaders", NAME, VERT_SHADER)
-  FRAG_SOURCE = File.join("shaders", NAME, FRAG_SHADER)
+  include Logging
+  def initialize(window)
+    @window = window
+    @name = 'triangle'
+    @vert_source = File.join('shaders', @name, 'triangle_vert_shader.glsl')
+    @frag_source = File.join('shaders', @name, 'triangle_frag_shader.glsl')
+  end
 
-  def draw(window)
-
+  def draw
     @running = true
 
     # setup vao
@@ -21,54 +20,54 @@ class Triangle
     glBindVertexArray(vao)
 
     vertices = [
-      [ 0.0,  0.5, 0.0 ],
-      [ 0.5, -0.5, 0.5 ],
-      [-0.5, -0.5, 1.0 ]]
-    #vertices_gray = vertices.map {|n| n[0..1]} # for just the xy coords
+      [0.0,  0.5, 0.0],
+      [0.5, -0.5, 0.5],
+      [-0.5, -0.5, 1.0]
+    ]
+    # vertices_gray = vertices.map {|n| n[0..1]} # for just the xy coords
 
     vbo_buf = Fiddle::Pointer.malloc(Fiddle::SIZEOF_INT)
-    glGenBuffers(1, buf)
-    vbo = buf[0, Fiddle::SIZEOF_INT].unpack('L')[0]
+    glGenBuffers(1, vbo_buf)
+    vbo = vbo_buf[0, Fiddle::SIZEOF_INT].unpack('L')[0]
     glBindBuffer(GL_ARRAY_BUFFER, vbo)
-    vertices_data_ptr = Fiddle::Pointer[vertices.flatten.pack("F*")]
+    vertices_data_ptr = Fiddle::Pointer[vertices.flatten.pack('F*')]
     vertices_data_size = Fiddle::SIZEOF_FLOAT * vertices.flatten.length
-    glBufferData(GL_ARRAY_BUFFER, vertices_data_size, vertices_data_ptr, GL_STATIC_DRAW)
+    glBufferData(GL_ARRAY_BUFFER,
+                 vertices_data_size,
+                 vertices_data_ptr,
+                 GL_STATIC_DRAW)
 
-    vertexShader = Utils::Shader.new(:vertex)
-    @running = false unless vertexShader.load(File.open(VERT_SOURCE, "r") {|f| f.read})
+    vertex_shader = Utils::Shader.new(:vertex)
+    @running = false unless vertex_shader.load(File.open(@vert_source, 'r', &:read))
 
-    fragShader = Utils::Shader.new(:fragment)
-    @running = false unless fragShader.load(File.open(FRAG_SOURCE, "r") {|f| f.read})
+    frag_shader = Utils::Shader.new(:fragment)
+    @running = false unless frag_shader.load(File.open(@frag_source, 'r', &:read))
 
-    shaderProgram = glCreateProgram()
-    glAttachShader(shaderProgram, vertexShader.id)
-    glAttachShader(shaderProgram, fragShader.id)
+    shader_program = glCreateProgram()
+    glAttachShader(shader_program, vertex_shader.id)
+    glAttachShader(shader_program, frag_shader.id)
 
-    glLinkProgram(shaderProgram)
-    glUseProgram(shaderProgram)
-
+    glLinkProgram(shader_program)
+    glUseProgram(shader_program)
 
     # Specify the layout of the vertex data
-    posAttrib = glGetAttribLocation(shaderProgram, "position")
-    glEnableVertexAttribArray(posAttrib)
-    glVertexAttribPointer(posAttrib,                # location
+    position_attribute = glGetAttribLocation(shader_program, 'position')
+    glEnableVertexAttribArray(position_attribute)
+    glVertexAttribPointer(position_attribute,       # location
                           2,                        # size
                           GL_FLOAT,                 # type
                           GL_FALSE,                 # normalized?
-                          Fiddle::SIZEOF_FLOAT * vertices[0].length, #stride
-                          #0,                       # stride
-                          Utils::NullPtr            # array buffer offset
-                         )
+                          Fiddle::SIZEOF_FLOAT * vertices[0].length, # stride
+                          Utils::NullPtr)           # array buffer offset
 
-    colAttrib = glGetAttribLocation(shaderProgram, "color")
-    glEnableVertexAttribArray(colAttrib)
-    glVertexAttribPointer(colAttrib,
+    color_attribute = glGetAttribLocation(shader_program, 'color')
+    glEnableVertexAttribArray(color_attribute)
+    glVertexAttribPointer(color_attribute,
                           3,
                           GL_FLOAT,
                           GL_FALSE,
                           Fiddle::SIZEOF_FLOAT * vertices[0].length,
-                          (Fiddle::Pointer[0] + Fiddle::SIZEOF_FLOAT * 2) # "Offset" pointer: space for 2 floats, cast to void*
-                         )
+                          (Fiddle::Pointer[0] + Fiddle::SIZEOF_FLOAT * 2)) # "Offset" pointer: space for 2 floats, cast to void*
 
     while @running
       event = SDL2::Event.poll
@@ -81,16 +80,16 @@ class Triangle
           @running = false
         end
       end
-      #render
+      # render
       glClearColor(0.0, 0.0, 0.0, 1.0)
       glClear(GL_COLOR_BUFFER_BIT)
 
       glDrawArrays(GL_TRIANGLES, 0, vertices.length)
 
-      window.window.gl_swap
+      @window.window.gl_swap
     end
   end
 end
 
-window = Window.new(800, 600, "triangle")
-Triangle.new.draw(window)
+window = Window.new(800, 600, 'triangle')
+Triangle.new(window).draw

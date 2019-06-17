@@ -1,27 +1,27 @@
 require_relative './lib/window'
 require_relative './lib/utils'
 
-require "rmath3d/rmath3d"
+require 'rmath3d/rmath3d'
 
 class Transformations
   include Logging
   using Utils::RadianHelper
 
-  Vertices = [    #  Position      Color             Texcoords
+  VERTICES = [    #  Position      Color             Texcoords
                   [ -0.5,  0.5, 1.0, 0.0, 0.0, 0.0, 0.0 ], # Top-left
                   [  0.5,  0.5, 0.0, 1.0, 0.0, 1.0, 0.0 ], # Top-right
                   [  0.5, -0.5, 0.0, 0.0, 1.0, 1.0, 1.0 ], # Bottom-right
                   [ -0.5, -0.5, 1.0, 1.0, 1.0, 0.0, 1.0 ]  # Bottom-left
-  ]
-  Elements = [
+  ].freeze
+  ELEMENTS = [
     0, 1, 2,
     2, 3, 0
-  ]
+  ].freeze
   def initialize(window)
     @window = window
-    @name = "transformations"
-    @vert_source = File.join("shaders", @name, "vert_shader.glsl")
-    @frag_source = File.join("shaders", @name, "two_textures_frag.glsl")
+    @name = 'transformations'
+    @vert_source = File.join('shaders', @name, 'vert_shader.glsl')
+    @frag_source = File.join('shaders', @name, 'two_textures_frag.glsl')
 
     @textures = Utils::Textures.new
 
@@ -40,8 +40,8 @@ class Transformations
     glBindBuffer(GL_ARRAY_BUFFER, vbo)
 
     # Upload vertices once, draw them many
-    vertices_data_ptr = Fiddle::Pointer[Vertices.flatten.pack("F*")]
-    vertices_data_size = Fiddle::SIZEOF_FLOAT * Vertices.flatten.length
+    vertices_data_ptr = Fiddle::Pointer[VERTICES.flatten.pack('F*')]
+    vertices_data_size = Fiddle::SIZEOF_FLOAT * VERTICES.flatten.length
     glBufferData(GL_ARRAY_BUFFER, vertices_data_size, vertices_data_ptr, GL_STATIC_DRAW)
 
 
@@ -49,70 +49,74 @@ class Transformations
     ebo_buf = Fiddle::Pointer.malloc(Fiddle::SIZEOF_INT)
     glGenBuffers(1, ebo_buf)
     ebo = ebo_buf[0, Fiddle::SIZEOF_INT].unpack('L')[0]
-    element_data_ptr = Fiddle::Pointer[Elements.pack("i*")]
-    element_data_size = Fiddle::SIZEOF_INT * Elements.length
+    element_data_ptr = Fiddle::Pointer[ELEMENTS.pack('i*')]
+    element_data_size = Fiddle::SIZEOF_INT * ELEMENTS.length
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo)
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, element_data_size, element_data_ptr, GL_STATIC_DRAW)
     vertexShader = Utils::Shader.new(:vertex)
-    @running = false unless vertexShader.load(File.open(@vert_source, "r") {|f| f.read})
+    @running = false unless vertexShader.load(File.open(@vert_source, 'r', &:read))
 
     fragShader = Utils::Shader.new(:fragment)
-    @running = false unless fragShader.load(File.open(@frag_source, "r") {|f| f.read})
+    @running = false unless fragShader.load(File.open(@frag_source, 'r', &:read))
 
-    @shaderProgram = glCreateProgram()
-    glAttachShader(@shaderProgram, vertexShader.id)
-    glAttachShader(@shaderProgram, fragShader.id)
-    glBindFragDataLocation(@shaderProgram, 0, "outColor")
+    @shader_program = glCreateProgram()
+    glAttachShader(@shader_program, vertexShader.id)
+    glAttachShader(@shader_program, fragShader.id)
+    glBindFragDataLocation(@shader_program, 0, 'outColor')
 
-    glLinkProgram(@shaderProgram)
-    glUseProgram(@shaderProgram)
+    glLinkProgram(@shader_program)
+    glUseProgram(@shader_program)
 
-    posAttrib = glGetAttribLocation(@shaderProgram, "position")
-    if posAttrib != -1
-      glEnableVertexAttribArray(posAttrib)
-      glVertexAttribPointer(posAttrib,                # location
-                            2,                        # size
-                            GL_FLOAT,                 # type
-                            GL_FALSE,                 # normalized?
-                            Fiddle::SIZEOF_FLOAT * Vertices[0].length, # stride: 5 items in each vertex(x,y,r,g,b)
-                            0        # no offset required
+    position_attribute = glGetAttribLocation(@shader_program, 'position')
+    if position_attribute != -1
+      glEnableVertexAttribArray(position_attribute)
+      glVertexAttribPointer(position_attribute,
+                            # size
+                            2,
+                            # type
+                            GL_FLOAT,
+                            # normalized?
+                            GL_FALSE,
+                            # stride: 5 items in each vertex(x,y,r,g,b)
+                            Fiddle::SIZEOF_FLOAT * VERTICES[0].length,
+                            # no offset required
+                            0
                            )
     end
 
-    colAttrib = glGetAttribLocation(@shaderProgram, "color")
-    if colAttrib != -1
-      glEnableVertexAttribArray(colAttrib)
-      glVertexAttribPointer(colAttrib,
+    color_attribute = glGetAttribLocation(@shader_program, 'color')
+    if color_attribute != -1
+      glEnableVertexAttribArray(color_attribute)
+      glVertexAttribPointer(color_attribute,
                             3,
                             GL_FLOAT,
                             GL_FALSE,
-                            Fiddle::SIZEOF_FLOAT * Vertices[0].length,
-                            (Fiddle::Pointer[0] + Fiddle::SIZEOF_FLOAT * 2) # "Offset" pointer: space for 2 floats, cast to void*
-                           )
+                            Fiddle::SIZEOF_FLOAT * VERTICES[0].length,
+                            # Offset pointer: space for 2 floats, cast to void*
+                            (Fiddle::Pointer[0] + Fiddle::SIZEOF_FLOAT * 2))
     end
 
-    texAttrib = glGetAttribLocation(@shaderProgram, "texcoord")
-    if texAttrib != -1
-      glEnableVertexAttribArray(texAttrib)
-      glVertexAttribPointer(texAttrib,
+    texcoord_attribute = glGetAttribLocation(@shader_program, 'texcoord')
+    if texcoord_attribute != -1
+      glEnableVertexAttribArray(texcoord_attribute)
+      glVertexAttribPointer(texcoord_attribute,
                             2,
                             GL_FLOAT,
                             GL_FALSE,
-                            Fiddle::SIZEOF_FLOAT * Vertices[0].length,
-                            (Fiddle::Pointer[0] + Fiddle::SIZEOF_FLOAT * 5) # "Offset" pointer: space for 2 floats, cast to void*
-                           )
+                            Fiddle::SIZEOF_FLOAT * VERTICES[0].length,
+                            # Offset pointer: space for 2 floats, cast to void*
+                            (Fiddle::Pointer[0] + Fiddle::SIZEOF_FLOAT * 5))
     end
     @textures.load('sample_earth.png', 'texEarth')
     @textures.load('sample_moon.png', 'texMoon')
 
-    glUniform1i(glGetUniformLocation(@shaderProgram, "texEarth"), @textures.slot_for("texEarth"));
-    glUniform1i(glGetUniformLocation(@shaderProgram, "texMoon"), @textures.slot_for("texMoon"));
+    glUniform1i(glGetUniformLocation(@shader_program, 'texEarth'), @textures.slot_for('texEarth'));
+    glUniform1i(glGetUniformLocation(@shader_program, 'texMoon'), @textures.slot_for('texMoon'));
 
   end
 
   def draw
-
-    uniModel = glGetUniformLocation(@shaderProgram, "model")
+    uniModel = glGetUniformLocation(@shader_program, 'model')
 
     # Set view matrix(original used glm::lookAt)
     view = RMath3D::RMtx4.new.lookAtRH(
@@ -121,8 +125,8 @@ class Transformations
       RMath3D::RVec3.new(0.0, 0.0, 1.0)  # up
     )
 
-    uniView = glGetUniformLocation(@shaderProgram, "view");
-    uniProj = glGetUniformLocation(@shaderProgram, "proj");
+    uniView = glGetUniformLocation(@shader_program, 'view');
+    uniProj = glGetUniformLocation(@shader_program, 'proj');
     # set projection matrix(original used glm:perspective)
     proj = RMath3D::RMtx4.new.perspectiveFovRH(45.0.to_rad, # FOV
                                               (@window.height.to_f / @window.width.to_f), # aspect
@@ -164,12 +168,12 @@ class Transformations
       # Update shader with new rotation
       glUniformMatrix4fv(uniModel, 1, GL_FALSE, Fiddle::Pointer[model.to_a.pack('F*')])
 
-      glDrawElements(GL_TRIANGLES, Elements.length, GL_UNSIGNED_INT, 0)
+      glDrawElements(GL_TRIANGLES, ELEMENTS.length, GL_UNSIGNED_INT, 0)
 
       @window.window.gl_swap
     end
   end
 end
 
-window = Window.new(800, 600, "transformations")
+window = Window.new(800, 600, 'transformations')
 Transformations.new(window).draw
