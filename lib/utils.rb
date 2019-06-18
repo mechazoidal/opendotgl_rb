@@ -64,7 +64,9 @@ module Utils
   def self.gl_get_errors
     e = glGetError()
     while e != GL_NO_ERROR
-      logger.error "glGetError: #{GL_ERROR_TYPE[e.to_i]}, from: #{caller.join("\n")}"
+      #logger.error "glGetError: #{GL_ERROR_TYPE[e.to_i]}, from: #{caller.join("\n")}"
+      #e = glGetError()
+      logger.error gl_get_one_error
     end
   end
 
@@ -89,8 +91,15 @@ module Utils
 
     glDebugMessageCallback(closure.to_i, NullPtr)
   # TODO: this should really rescue Fiddle::DLError, but I don't know if you can!
-  rescue RuntimeError # => exception
+  rescue RuntimeError
     logger.warn('glDebugMessageCallback not available on this platform')
+  end
+
+  def self.parse_window_size(size_string)
+    window_size = size_string.rpartition('x')
+    return nil unless window_size.all? { |s| !s.empty? }
+
+    { width: window_size[0].to_i, height: window_size[2].to_i }
   end
 
   module RadianHelper

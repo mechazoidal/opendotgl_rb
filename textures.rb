@@ -1,10 +1,11 @@
 require_relative './lib/window'
 require_relative './lib/utils'
+require 'optimist'
 
 class Textures
   include Logging
   attr_reader :name
-  VERTICES = [  # Position | Color  |  Texcoords    |
+  VERTICES = [  # Position | Color   |  Texcoords   |
                 # Top-left
                 [-0.5,  0.5, 1.0, 0.0, 0.0, 0.0, 0.0],
                 # Top-right
@@ -18,6 +19,22 @@ class Textures
     0, 1, 2,
     2, 3, 0
   ].freeze
+  def self.checkerboard(window)
+    Textures.new(window, 'no_tex_frag.glsl').draw_checkerboard
+  end
+
+  def self.basic(window)
+    Textures.new(window, 'one_texture_frag.glsl').draw_texture
+  end
+
+  def self.blend(window)
+    Textures.new(window, 'two_textures_frag.glsl').draw_blend_texture
+  end
+
+  def self.blend_animated(window)
+    Textures.new(window, 'anim_tex_frag_shader.glsl').draw_anim_blend_texture
+  end
+
   def initialize(window, frag_shader)
     @window = window
     @name = 'textures'
@@ -79,7 +96,6 @@ class Textures
     # Note that if the fragment shader does not USE the attribute, the GLSL compiler is free to strip it!
     # Thus we can't blindly enable the vertex attrib array unless we get a real location back.
     position_attribute = glGetAttribLocation(@shader_program, 'position')
-    #if position_attribute != -1
     if position_attribute != -1
       glEnableVertexAttribArray(position_attribute)
       glVertexAttribPointer(position_attribute,
@@ -121,7 +137,6 @@ class Textures
   end
 
   def draw_checkerboard
-
     # textures
     tex_buf = Fiddle::Pointer.malloc(Fiddle::SIZEOF_INT)
     glGenTextures(1, tex_buf)
@@ -249,12 +264,12 @@ class Textures
     glBindTexture(GL_TEXTURE_2D, tex_buffer)
 
     # x,y,z = s,t,r in textures
-    # set clamping for s and t coordinates
 
+    # set clamping for s and t coordinates
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
 
-    #Specify interpolation for scaling up/down*/
+    # Specify interpolation for scaling up/down*/
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
 
@@ -297,7 +312,8 @@ class Textures
       glClear(GL_COLOR_BUFFER_BIT)
 
       glDrawElements(GL_TRIANGLES, ELEMENTS.length, GL_UNSIGNED_INT, 0)
-    Utils.gl_get_errors
+
+      Utils.gl_get_errors
 
       @window.window.gl_swap
     end
@@ -343,8 +359,28 @@ class Textures
   end
 end
 
-window = Window.new(800, 600, 'textures')
-#Textures.new(window, "no_tex_frag.glsl").draw_checkerboard
-#Textures.new(window, "one_texture_frag.glsl").draw_texture
-#Textures.new(window, "two_textures_frag.glsl").draw_blend_texture
-Textures.new(window, 'anim_tex_frag_shader.glsl').draw_anim_blend_texture
+opts = Optimist.options do
+  opt :size, 'width X height string', default: '800x600'
+  opt :example, 'example to run(checkerboard, basic, blend)', default: 'blend'
+end
+
+window_size = Utils.parse_window_size(opts[:size])
+Optimist.die('Valid size string is required') unless window_size
+Optimist.die('Valid width is required') unless window_size[:width] > 0
+Optimist.die('Valid height is required') unless window_size[:height] > 0
+
+examples = %w[checkerboard basic blend blend_animated]
+Optimist.die("Example must be one of: #{examples}") unless examples.include?(opts[:example])
+
+window = Window.new(window_size[:width], window_size[:height], 'textures')
+
+case opts[:example]
+when 'checkerboard'
+  Textures.checkerboard(window)
+when 'basic'
+  Textures.basic(window)
+when 'blend'
+  Textures.blend(window)
+when 'blend_animated'
+  Textures.blend_animated(window)
+end
