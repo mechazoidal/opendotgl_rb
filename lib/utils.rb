@@ -209,20 +209,25 @@ module Utils
       vertex_attribute = glGetAttribLocation(@id, name)
       if vertex_attribute != -1
         glEnableVertexAttribArray(vertex_attribute)
-        logger.debug "enabling vertex attrib array for '#{name}'(#{vertex_attribute}): size: #{size}, type: #{type.to_s}, stride: #{stride}, offset: #{offset}"
+        logger.debug {"enabling vertex attrib array for '#{name}'"\
+                      "(#{vertex_attribute}): "\
+                      "size: #{size}, "\
+                      "type: #{type.to_s}, "\
+                      "stride: #{stride}, "\
+                      "offset: #{offset}"}
         glVertexAttribPointer(vertex_attribute,
                               size,
                               gl_type(type),
                               # normalized?
                               GL_FALSE,
                               fiddle_type(type) * stride,
-                              # Yes, setting the offset is weird(an offset void* pointer)
+                              # Yes, the offset argument is weird(an offset void* pointer)
                               # Blame the OpenGL ARB and backwards-compatibility hacks!
                               Utils::NullPtr + fiddle_type(type) * offset
                              )
         vertex_attribute
       else
-        logger.info("shader vertex attribute '#{name}' was requested but not found(probably stripped/unused by driver)")
+        logger.info("shader vertex attribute '#{name}' was requested but not found(possibly stripped by driver)")
         nil
       end
     end

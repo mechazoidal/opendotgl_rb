@@ -19,21 +19,6 @@ class Textures
     0, 1, 2,
     2, 3, 0
   ].freeze
-  def self.checkerboard(window)
-    Textures.new(window, 'no_tex_frag.glsl').draw_checkerboard
-  end
-
-  def self.basic(window)
-    Textures.new(window, 'one_texture_frag.glsl').draw_texture
-  end
-
-  def self.blend(window)
-    Textures.new(window, 'two_textures_frag.glsl').draw_blend_texture
-  end
-
-  def self.blend_animated(window)
-    Textures.new(window, 'anim_tex_frag_shader.glsl').draw_anim_blend_texture
-  end
 
   def initialize(window, frag_shader)
     @window = window
@@ -77,6 +62,9 @@ class Textures
                  element_data_ptr,
                  GL_STATIC_DRAW)
 
+  end
+
+  def create_shader_program
     vertex_shader = Utils::Shader.new(:vertex)
     @running = false unless vertex_shader.load(File.open(@vert_source, 'r', &:read))
 
@@ -90,8 +78,9 @@ class Textures
     glBindFragDataLocation(@shader_program, 0, 'outColor')
 
     glLinkProgram(@shader_program)
-    glUseProgram(@shader_program)
+  end
 
+  def setup_position_vertex_attribute
     # Setup our vertex attributes
     # Note that if the fragment shader does not USE the attribute, the GLSL compiler is free to strip it!
     # Thus we can't blindly enable the vertex attrib array unless we get a real location back.
@@ -110,7 +99,9 @@ class Textures
                             # no offset required
                             0)
     end
+  end
 
+  def setup_color_vertex_attribute
     color_attribute = glGetAttribLocation(@shader_program, 'color')
     if color_attribute != -1
       glEnableVertexAttribArray(color_attribute)
@@ -122,7 +113,9 @@ class Textures
                             # Offset pointer: space for 2 floats, cast to void*
                             (Fiddle::Pointer[0] + Fiddle::SIZEOF_FLOAT * 2))
     end
+  end
 
+  def setup_texcoord_vertex_attribute
     texcoord_attribute = glGetAttribLocation(@shader_program, 'texcoord')
     if texcoord_attribute != -1
       glEnableVertexAttribArray(texcoord_attribute)
@@ -136,8 +129,57 @@ class Textures
     end
   end
 
-  def draw_checkerboard
-    # textures
+  def load_texture(filename, name, slot, tex_buffer)
+    logger.debug("load_texture: loading #{filename} "\
+                 "to name '#{name}' "\
+                 "at slot '#{slot}' (#{@textures[slot]}) "\
+                 "to buffer #{tex_buffer}")
+    glActiveTexture(@textures[slot])
+    glBindTexture(GL_TEXTURE_2D, tex_buffer)
+
+    # x,y,z = s,t,r in textures
+
+    # set clamping for s and t coordinates
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+
+    # Specify interpolation for scaling up/down*/
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+
+    image = SDL2::Surface.load(filename)
+    image_ptr = Fiddle::Pointer[image.pixels]
+    mode = image.bytes_per_pixel == 4 ? GL_RGBA : GL_RGB
+    glTexImage2D(GL_TEXTURE_2D,
+                 0,
+                 mode,
+                 image.w,
+                 image.h,
+                 0,
+                 mode,
+                 GL_UNSIGNED_BYTE,
+                 image_ptr)
+    image.destroy
+
+    uni_buf = glGetUniformLocation(@shader_program, name)
+    logger.debug { "attribute #{name} location: #{uni_buf.inspect}" }
+    glUniform1i(uni_buf, slot)
+    Utils.gl_get_errors
+    nil
+  end
+end
+
+class Checkerboard < Textures
+  def initialize(window)
+    super(window, 'no_tex_frag.glsl')
+    create_shader_program
+    glUseProgram(@shader_program)
+    #setup_position_vertex_attribute
+    #setup_color_vertex_attribute
+  end
+
+  def draw
+    # Get our texture memory.
     tex_buf = Fiddle::Pointer.malloc(Fiddle::SIZEOF_INT)
     glGenTextures(1, tex_buf)
     tex = tex_buf[0, Fiddle::SIZEOF_INT].unpack('L')[0]
@@ -164,11 +206,10 @@ class Textures
 
     # change border color to red
     # FIXME not working?
-    color = [1.0, 0.0, 0.0, 1.0]
-    color_ptr = Fiddle::Pointer[color.pack('F*')]
-    glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, color_ptr)
+    #color = [1.0, 0.0, 0.0, 1.0]
+    #color_ptr = Fiddle::Pointer[color.pack('F*')]
+    #glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, color_ptr)
 
-    # FIXME it's a bit fuzzy, am I missing something here?
     pixels_ptr = Fiddle::Pointer[pixels.pack('F*')]
 
     glTexImage2D(GL_TEXTURE_2D,
@@ -191,7 +232,7 @@ class Textures
 
     glGenerateMipmap(GL_TEXTURE_2D)
 
-    # Event loop
+    # Start event loop
     while @running
       event = SDL2::Event.poll
       case event
@@ -204,6 +245,7 @@ class Textures
         end
       end
 
+      # Draw to screen
       glClearColor(0.0, 0.0, 0.0, 1.0)
       glClear(GL_COLOR_BUFFER_BIT)
       glDrawElements(GL_TRIANGLES, ELEMENTS.length, GL_UNSIGNED_INT, 0)
@@ -211,8 +253,19 @@ class Textures
       @window.window.gl_swap
     end
   end
+end
 
-  def draw_texture
+class Basic < Textures
+  def initialize(window)
+    super(window, 'one_texture_frag.glsl')
+    create_shader_program
+    glUseProgram(@shader_program)
+    setup_position_vertex_attribute
+    setup_color_vertex_attribute
+    setup_texcoord_vertex_attribute
+  end
+
+  def draw
     tex_buf = Fiddle::Pointer.malloc(Fiddle::SIZEOF_INT)
     glGenTextures(1, tex_buf)
     tex = tex_buf[0, Fiddle::SIZEOF_INT].unpack('L')[0]
@@ -221,7 +274,15 @@ class Textures
     image = SDL2::Surface.load('sample_earth.png')
     image_ptr = Fiddle::Pointer[image.pixels]
     mode = image.bytes_per_pixel == 4 ? GL_RGBA : GL_RGB
-    glTexImage2D(GL_TEXTURE_2D, 0, mode, image.w, image.h, 0, mode, GL_UNSIGNED_BYTE, image_ptr)
+    glTexImage2D(GL_TEXTURE_2D,
+                 0,
+                 mode,
+                 image.w,
+                 image.h,
+                 0,
+                 mode,
+                 GL_UNSIGNED_BYTE,
+                 image_ptr)
     image.destroy
     Utils.gl_get_errors
 
@@ -235,6 +296,7 @@ class Textures
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
 
+    # Start render loop
     while @running
       event = SDL2::Event.poll
       case event
@@ -247,6 +309,7 @@ class Textures
         end
       end
 
+      # Draw to screen
       glClearColor(0.0, 0.0, 0.0, 1.0)
       glClear(GL_COLOR_BUFFER_BIT)
       glDrawElements(GL_TRIANGLES, ELEMENTS.length, GL_UNSIGNED_INT, 0)
@@ -254,39 +317,19 @@ class Textures
       @window.window.gl_swap
     end
   end
+end
 
-  def load_texture(filename, name, slot, tex_buffer)
-    logger.debug {"load_texture: loading #{filename} \
-                  to name #{name} \
-                  at slot #{slot}(#{@textures[slot]}) \
-                  to buffer #{tex_buffer}"}
-    glActiveTexture(@textures[slot])
-    glBindTexture(GL_TEXTURE_2D, tex_buffer)
-
-    # x,y,z = s,t,r in textures
-
-    # set clamping for s and t coordinates
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
-
-    # Specify interpolation for scaling up/down*/
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
-
-    image = SDL2::Surface.load(filename)
-    image_ptr = Fiddle::Pointer[image.pixels]
-    mode = image.bytes_per_pixel == 4 ? GL_RGBA : GL_RGB
-    glTexImage2D(GL_TEXTURE_2D, 0, mode, image.w, image.h, 0, mode, GL_UNSIGNED_BYTE, image_ptr)
-    image.destroy
-
-    uni_buf = glGetUniformLocation(@shader_program, name)
-    logger.debug {"attribute #{name} location: #{uni_buf.inspect}"}
-    glUniform1i(uni_buf, slot)
-    Utils.gl_get_errors
-    nil
+class Blend < Textures
+  def initialize(window)
+    super(window, 'two_textures_frag.glsl')
+    create_shader_program
+    glUseProgram(@shader_program)
+    setup_position_vertex_attribute
+    setup_color_vertex_attribute
+    setup_texcoord_vertex_attribute
   end
 
-  def draw_blend_texture
+  def draw
     tex_buf = Fiddle::Pointer.malloc(Fiddle::SIZEOF_INT * 2)
     glGenTextures(2, tex_buf)
     tex = [tex_buf[0, Fiddle::SIZEOF_INT].unpack('L')[0],
@@ -296,6 +339,7 @@ class Textures
     load_texture('sample_moon.png', 'texMoon', 1, tex[1])
     Utils.gl_get_errors
 
+    # Start render loop
     while @running
       event = SDL2::Event.poll
       case event
@@ -308,6 +352,7 @@ class Textures
         end
       end
 
+      # Draw to screen
       glClearColor(0.0, 0.0, 0.0, 1.0)
       glClear(GL_COLOR_BUFFER_BIT)
 
@@ -318,8 +363,19 @@ class Textures
       @window.window.gl_swap
     end
   end
+end
 
-  def draw_anim_blend_texture
+class BlendAnimated < Textures
+  def initialize(window)
+    super(window, 'anim_tex_frag_shader.glsl')
+    create_shader_program
+    glUseProgram(@shader_program)
+    setup_position_vertex_attribute
+    setup_color_vertex_attribute
+    setup_texcoord_vertex_attribute
+  end
+
+  def draw
     start_time = Time.now
     tex_buf = Fiddle::Pointer.malloc(Fiddle::SIZEOF_INT * 2)
     glGenTextures(2, tex_buf)
@@ -331,9 +387,11 @@ class Textures
     load_texture('sample_moon.png', 'texMoon', 1, tex[1])
 
     uni_time = glGetUniformLocation(@shader_program, 'uniTime')
-    logger.debug {"texUniform: #{glGetUniformLocation(@shader_program, 'texEarth')}"}
-    logger.debug {"texUniform: #{glGetUniformLocation(@shader_program, 'texMoon')}"}
-    logger.debug {"uni_time location: #{uni_time.inspect}"}
+    logger.debug { "texUniform: #{glGetUniformLocation(@shader_program, 'texEarth')}" }
+    logger.debug { "texUniform: #{glGetUniformLocation(@shader_program, 'texMoon')}" }
+    logger.debug "uni_time location: #{uni_time.inspect}"
+
+    # Start render loop
     while @running
       event = SDL2::Event.poll
       case event
@@ -346,6 +404,7 @@ class Textures
         end
       end
 
+      # Draw to screen
       glClearColor(0.0, 0.0, 0.0, 1.0)
       glClear(GL_COLOR_BUFFER_BIT)
 
@@ -359,9 +418,12 @@ class Textures
   end
 end
 
+examples = %w[checkerboard basic blend blend_animated]
+
 opts = Optimist.options do
   opt :size, 'width X height string', default: '800x600'
-  opt :example, 'example to run(checkerboard, basic, blend)', default: 'blend'
+  opt :example, "example to run: #{examples.join(', ')}", default: 'blend'
+  opt :verbose, 'say a lot', default: false
 end
 
 window_size = Utils.parse_window_size(opts[:size])
@@ -369,18 +431,20 @@ Optimist.die('Valid size string is required') unless window_size
 Optimist.die('Valid width is required') unless window_size[:width] > 0
 Optimist.die('Valid height is required') unless window_size[:height] > 0
 
-examples = %w[checkerboard basic blend blend_animated]
 Optimist.die("Example must be one of: #{examples}") unless examples.include?(opts[:example])
 
-window = Window.new(window_size[:width], window_size[:height], 'textures')
+window = Window.new(window_size[:width],
+                    window_size[:height],
+                    'textures',
+                    opts[:verbose])
 
 case opts[:example]
 when 'checkerboard'
-  Textures.checkerboard(window)
+  Checkerboard.new(window).draw
 when 'basic'
-  Textures.basic(window)
+  Basic.new(window).draw
 when 'blend'
-  Textures.blend(window)
+  Blend.new(window).draw
 when 'blend_animated'
-  Textures.blend_animated(window)
+  BlendAnimated.new(window).draw
 end
