@@ -1,4 +1,4 @@
-require_relative './lib/window'
+require_relative './lib/application'
 require_relative './lib/utils'
 require 'optimist'
 
@@ -436,7 +436,7 @@ Optimist.die('Valid height is required') unless window_size[:height] > 0
 
 Optimist.die("Example must be one of: #{examples}") unless examples.include?(opts[:example])
 
-window = Window.new(window_size[:width],
+window = Application.new(window_size[:width],
                     window_size[:height],
                     'textures',
                     opts[:verbose])

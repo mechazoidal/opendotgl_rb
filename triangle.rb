@@ -1,5 +1,5 @@
 require_relative './lib/utils'
-require_relative './lib/window'
+require_relative './lib/application'
 
 class Triangle
   include Logging
@@ -91,5 +91,5 @@ class Triangle
   end
 end
 
-window = Window.new(800, 600, 'triangle')
+window = Application.new(800, 600, 'triangle')
 Triangle.new(window).draw

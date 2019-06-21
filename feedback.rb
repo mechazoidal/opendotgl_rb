@@ -1,4 +1,4 @@
-require_relative './lib/window'
+require_relative './lib/application'
 require_relative './lib/utils'
 require_relative './data'
 require 'rmath3d/rmath3d'
@@ -229,6 +229,6 @@ class FeedbackGravity
   end
 end
 
-window = Window.new(800, 600, 'feedback')
+window = Application.new(800, 600, 'feedback')
 #Feedback.new(window).calculate
 FeedbackGravity.new(window).draw

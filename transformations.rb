@@ -1,4 +1,4 @@
-require_relative './lib/window'
+require_relative './lib/application'
 require_relative './lib/utils'
 
 require 'rmath3d/rmath3d'
@@ -175,5 +175,5 @@ class Transformations
   end
 end
 
-window = Window.new(800, 600, 'transformations')
+window = Application.new(800, 600, 'transformations')
 Transformations.new(window).draw

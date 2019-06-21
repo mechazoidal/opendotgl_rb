@@ -1,4 +1,4 @@
-require_relative './lib/window'
+require_relative './lib/application'
 require_relative './lib/utils'
 require_relative './data'
 
@@ -229,5 +229,5 @@ class Framebuffer
   end
 end
 
-window = Window.new(800, 600, 'framebuffer') #, true)
+window = Application.new(800, 600, 'framebuffer') #, true)
 Framebuffer.new(window).draw

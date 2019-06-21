@@ -1,4 +1,4 @@
-require_relative './lib/window'
+require_relative './lib/application'
 require_relative './lib/utils'
 require_relative './data'
 require 'rmath3d/rmath3d'
@@ -67,5 +67,5 @@ class Geometry
   end
 end
 
-window = Window.new(800, 600, 'geometry') #, true)
+window = Application.new(800, 600, 'geometry') #, true)
 Geometry.new(window).draw

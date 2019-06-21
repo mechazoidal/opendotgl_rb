@@ -1,4 +1,4 @@
-require_relative './lib/window'
+require_relative './lib/application'
 require_relative './lib/utils'
 
 class Rectangle
@@ -110,5 +110,5 @@ class Rectangle
   end
 end
 
-window = Window.new(800, 600, 'rectangle')
+window = Application.new(800, 600, 'rectangle')
 Rectangle.new(window).draw
