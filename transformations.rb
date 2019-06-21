@@ -1,5 +1,5 @@
 require_relative './lib/application'
-require_relative 'data'
+require_relative './lib/data'
 require_relative './lib/utils'
 
 require 'optimist'

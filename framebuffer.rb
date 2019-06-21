@@ -1,6 +1,6 @@
 require_relative './lib/application'
 require_relative './lib/utils'
-require_relative './data'
+require_relative './lib/data'
 
 require 'optimist'
 require 'rmath3d/rmath3d'
