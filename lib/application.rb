@@ -16,7 +16,7 @@ end
 
 require 'sdl2'
 
-class Window
+class Application
   include Logging
 
   attr_reader :window, :width, :height
