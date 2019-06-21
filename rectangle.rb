@@ -1,22 +1,12 @@
 require_relative './lib/application'
+require_relative 'data'
 require_relative './lib/utils'
+require 'optimist'
 
 class Rectangle
-  VERTICES = [
-    # Top-left
-    [-0.5,  0.5, 1.0, 0.0, 0.0],
-    # Top-right
-    [ 0.5,  0.5, 0.0, 1.0, 0.0],
-    # Bottom-right
-    [ 0.5, -0.5, 0.0, 0.0, 1.0],
-    # Bottom-left
-    [-0.5, -0.5, 1.0, 1.0, 1.0]
-  ].freeze
+  VERTICES = GeometryData::Rectangle::VERTICES
+  ELEMENTS = GeometryData::ELEMENTS
   # vertices_gray = vertices.map {|n| n[0..1]}
-  ELEMENTS = [
-    0, 1, 2,
-    2, 3, 0
-  ].freeze
   def initialize(window)
     @window = window
     @name = 'rectangle'
@@ -110,5 +100,17 @@ class Rectangle
   end
 end
 
-window = Application.new(800, 600, 'rectangle')
+opts = Optimist.options do
+  opt :size, 'width X height string', default: '800x600'
+  opt :verbose, 'say a lot', default: false
+end
+window_size = Utils.parse_window_size(opts[:size])
+Optimist.die('Valid size string is required') unless window_size
+Optimist.die('Valid width is required') unless window_size[:width] > 0
+Optimist.die('Valid height is required') unless window_size[:height] > 0
+
+window = Application.new(window_size[:width],
+                         window_size[:height],
+                         'rectangle',
+                         opts[:verbose])
 Rectangle.new(window).draw

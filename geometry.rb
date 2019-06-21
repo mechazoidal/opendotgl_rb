@@ -1,6 +1,7 @@
 require_relative './lib/application'
 require_relative './lib/utils'
 require_relative './data'
+require 'optimist'
 require 'rmath3d/rmath3d'
 
 class Geometry
@@ -12,12 +13,12 @@ class Geometry
     frag_source = File.join('shaders', @name, 'fragShader.glsl')
     geometry_source = File.join('shaders', @name, 'geometryShader.glsl')
 
-    @shaderProgram = Utils::ShaderProgram.new
-    @shaderProgram.load_and_attach(:vertex, File.open(vertex_source, 'r', &:read))
-    @shaderProgram.load_and_attach(:fragment, File.open(frag_source, 'r', &:read))
-    @shaderProgram.load_and_attach(:geometry, File.open(geometry_source, 'r', &:read))
-    @shaderProgram.link
-    @shaderProgram.use
+    @shader_program = Utils::ShaderProgram.new
+    @shader_program.load_and_attach(:vertex, File.open(vertex_source, 'r', &:read))
+    @shader_program.load_and_attach(:fragment, File.open(frag_source, 'r', &:read))
+    @shader_program.load_and_attach(:geometry, File.open(geometry_source, 'r', &:read))
+    @shader_program.link
+    @shader_program.use
 
     @vbo = Utils::VertexBuffer.new
     points = [
@@ -38,16 +39,16 @@ class Geometry
     @vao.bind
     # specify layout of point data:
     # The position is the first two items
-    @shaderProgram.enable_vertex_attrib('pos', 2, :float, 6)
+    @shader_program.enable_vertex_attrib('pos', 2, :float, 6)
     # Color is the next three items
-    @shaderProgram.enable_vertex_attrib('color', 3, :float, 6, 2)
+    @shader_program.enable_vertex_attrib('color', 3, :float, 6, 2)
     # Sides-per-object is the last item
-    @shaderProgram.enable_vertex_attrib('sides', 1, :float, 6, 5)
+    @shader_program.enable_vertex_attrib('sides', 1, :float, 6, 5)
   end
 
   def draw
     @running = true
-    @shaderProgram.use
+    @shader_program.use
     while @running
       event = SDL2::Event.poll
       case event
@@ -59,13 +60,25 @@ class Geometry
           @running = false
         end
       end
-      glClearColor(0.0, 0.0, 0.0, 1.0);
-      glClear(GL_COLOR_BUFFER_BIT);
-      glDrawArrays(GL_POINTS, 0, 4);
+      glClearColor(0.0, 0.0, 0.0, 1.0)
+      glClear(GL_COLOR_BUFFER_BIT)
+      glDrawArrays(GL_POINTS, 0, 4)
       @window.window.gl_swap
     end
   end
 end
 
-window = Application.new(800, 600, 'geometry') #, true)
+opts = Optimist.options do
+  opt :size, 'width X height string', default: '800x600'
+  opt :verbose, 'say a lot', default: false
+end
+window_size = Utils.parse_window_size(opts[:size])
+Optimist.die('Valid size string is required') unless window_size
+Optimist.die('Valid width is required') unless window_size[:width] > 0
+Optimist.die('Valid height is required') unless window_size[:height] > 0
+
+window = Application.new(window_size[:width],
+                         window_size[:height],
+                         'geometry',
+                         opts[:verbose])
 Geometry.new(window).draw

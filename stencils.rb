@@ -1,63 +1,16 @@
 require_relative './lib/application'
+require_relative 'data'
 require_relative './lib/utils'
 
+require 'optimist'
 require 'rmath3d/rmath3d'
 
 class Stencils
   include Logging
   using Utils::RadianHelper
 
-  VERTICES = [
-    [-0.5, -0.5, -0.5, 1.0, 1.0, 1.0, 0.0, 0.0],
-    [ 0.5, -0.5, -0.5, 1.0, 1.0, 1.0, 1.0, 0.0],
-    [ 0.5,  0.5, -0.5, 1.0, 1.0, 1.0, 1.0, 1.0],
-    [ 0.5,  0.5, -0.5, 1.0, 1.0, 1.0, 1.0, 1.0],
-    [-0.5,  0.5, -0.5, 1.0, 1.0, 1.0, 0.0, 1.0],
-    [-0.5, -0.5, -0.5, 1.0, 1.0, 1.0, 0.0, 0.0],
-
-    [-0.5, -0.5,  0.5, 1.0, 1.0, 1.0, 0.0, 0.0],
-    [ 0.5, -0.5,  0.5, 1.0, 1.0, 1.0, 1.0, 0.0],
-    [ 0.5,  0.5,  0.5, 1.0, 1.0, 1.0, 1.0, 1.0],
-    [ 0.5,  0.5,  0.5, 1.0, 1.0, 1.0, 1.0, 1.0],
-    [-0.5,  0.5,  0.5, 1.0, 1.0, 1.0, 0.0, 1.0],
-    [-0.5, -0.5,  0.5, 1.0, 1.0, 1.0, 0.0, 0.0],
-
-    [-0.5,  0.5,  0.5, 1.0, 1.0, 1.0, 1.0, 0.0],
-    [-0.5,  0.5, -0.5, 1.0, 1.0, 1.0, 1.0, 1.0],
-    [-0.5, -0.5, -0.5, 1.0, 1.0, 1.0, 0.0, 1.0],
-    [-0.5, -0.5, -0.5, 1.0, 1.0, 1.0, 0.0, 1.0],
-    [-0.5, -0.5,  0.5, 1.0, 1.0, 1.0, 0.0, 0.0],
-    [-0.5,  0.5,  0.5, 1.0, 1.0, 1.0, 1.0, 0.0],
-
-    [ 0.5,  0.5,  0.5, 1.0, 1.0, 1.0, 1.0, 0.0],
-    [ 0.5,  0.5, -0.5, 1.0, 1.0, 1.0, 1.0, 1.0],
-    [ 0.5, -0.5, -0.5, 1.0, 1.0, 1.0, 0.0, 1.0],
-    [ 0.5, -0.5, -0.5, 1.0, 1.0, 1.0, 0.0, 1.0],
-    [ 0.5, -0.5,  0.5, 1.0, 1.0, 1.0, 0.0, 0.0],
-    [ 0.5,  0.5,  0.5, 1.0, 1.0, 1.0, 1.0, 0.0],
-
-    [-0.5, -0.5, -0.5, 1.0, 1.0, 1.0, 0.0, 1.0],
-    [ 0.5, -0.5, -0.5, 1.0, 1.0, 1.0, 1.0, 1.0],
-    [ 0.5, -0.5,  0.5, 1.0, 1.0, 1.0, 1.0, 0.0],
-    [ 0.5, -0.5,  0.5, 1.0, 1.0, 1.0, 1.0, 0.0],
-    [-0.5, -0.5,  0.5, 1.0, 1.0, 1.0, 0.0, 0.0],
-    [-0.5, -0.5, -0.5, 1.0, 1.0, 1.0, 0.0, 1.0],
-
-    [-0.5,  0.5, -0.5, 1.0, 1.0, 1.0, 0.0, 1.0],
-    [ 0.5,  0.5, -0.5, 1.0, 1.0, 1.0, 1.0, 1.0],
-    [ 0.5,  0.5,  0.5, 1.0, 1.0, 1.0, 1.0, 0.0],
-    [ 0.5,  0.5,  0.5, 1.0, 1.0, 1.0, 1.0, 0.0],
-    [-0.5,  0.5,  0.5, 1.0, 1.0, 1.0, 0.0, 0.0],
-    [-0.5,  0.5, -0.5, 1.0, 1.0, 1.0, 0.0, 1.0],
-
-# floor
-    [-1.0, -1.0, -0.5, 0.0, 0.0, 0.0, 0.0, 0.0],
-    [ 1.0, -1.0, -0.5, 0.0, 0.0, 0.0, 1.0, 0.0],
-    [ 1.0,  1.0, -0.5, 0.0, 0.0, 0.0, 1.0, 1.0],
-    [ 1.0,  1.0, -0.5, 0.0, 0.0, 0.0, 1.0, 1.0],
-    [-1.0,  1.0, -0.5, 0.0, 0.0, 0.0, 0.0, 1.0],
-    [-1.0, -1.0, -0.5, 0.0, 0.0, 0.0, 0.0, 0.0]
-  ].freeze
+  VERTICES = GeometryData::Stencils::VERTICES
+  ELEMENTS = GeometryData::ELEMENTS
 
   def initialize(window)
     @window = window
@@ -90,38 +43,37 @@ class Stencils
     # No element buffers required for this lesson since we use glDrawArrays
 
     # setup shaders
-    vertexShader = Utils::Shader.new(:vertex)
-    @running = false unless vertexShader.load(File.open(@vert_source, 'r', &:read))
+    vertex_shader = Utils::Shader.new(:vertex)
+    @running = false unless vertex_shader.load(File.open(@vert_source, 'r', &:read))
 
-    fragShader = Utils::Shader.new(:fragment)
-    @running = false unless fragShader.load(File.open(@frag_source, 'r', &:read))
+    frag_shader = Utils::Shader.new(:fragment)
+    @running = false unless frag_shader.load(File.open(@frag_source, 'r', &:read))
 
-    @shaderProgram = Utils::ShaderProgram.new
-    @shaderProgram.attach(vertexShader)
-    @shaderProgram.attach(fragShader)
-    @shaderProgram.bind_frag('outColor')
+    @shader_program = Utils::ShaderProgram.new
+    @shader_program.attach(vertex_shader)
+    @shader_program.attach(frag_shader)
+    @shader_program.bind_frag('outColor')
 
-    @shaderProgram.link_and_use
+    @shader_program.link_and_use
 
-    @shaderProgram.enable_vertex_attrib('position', 3, :float, VERTICES[0].length)
-    @shaderProgram.enable_vertex_attrib('color',    3, :float, VERTICES[0].length, 3)
-    @shaderProgram.enable_vertex_attrib('texcoord', 2, :float, VERTICES[0].length, 6)
+    @shader_program.enable_vertex_attrib('position', 3, :float, VERTICES[0].length)
+    @shader_program.enable_vertex_attrib('color',    3, :float, VERTICES[0].length, 3)
+    @shader_program.enable_vertex_attrib('texcoord', 2, :float, VERTICES[0].length, 6)
 
     @textures.load('sample_earth.png', 'texEarth')
     @textures.load('sample_moon.png', 'texMoon')
 
     # TODO
-    glUniform1i(@shaderProgram.uniform_location('texEarth'),
+    glUniform1i(@shader_program.uniform_location('texEarth'),
                 @textures.slot_for('texEarth'))
-    glUniform1i(@shaderProgram.uniform_location('texMoon'),
+    glUniform1i(@shader_program.uniform_location('texMoon'),
                 @textures.slot_for('texMoon'))
-
   end
 
   def draw
     start_time = Time.now
 
-    uniModel = @shaderProgram.uniform_location('model')
+    uniform_model = @shader_program.uniform_location('model')
 
     # Set view matrix (original used glm::lookAt)
     view = RMath3D::RMtx4.new.lookAtRH(
@@ -133,26 +85,24 @@ class Stencils
       RMath3D::RVec3.new(0.0, 0.0, 1.0)
     )
 
-
     proj = RMath3D::RMtx4.new.perspectiveFovRH(45.0.to_rad, # FOV
-                                              # aspect ratio
-                                              (@window.height.to_f / @window.width.to_f),
-                                              # z-clipping near-plane
-                                              1.0,
-                                              # z-clipping far-plane
-                                              10.0)
+                                               # aspect ratio
+                                               (@window.height.to_f / @window.width.to_f),
+                                               # z-clipping near-plane
+                                               1.0,
+                                               # z-clipping far-plane
+                                               10.0)
 
-    uniView = @shaderProgram.uniform_location('view')
-    uniProj = @shaderProgram.uniform_location('proj')
-
+    uniform_view = @shader_program.uniform_location('view')
+    uniform_proj = @shader_program.uniform_location('proj')
 
     # Send view and proj matrix variables to shader.
     # We only do this once since they will not change per-frame.
-    glUniformMatrix4fv(uniView, 1, GL_FALSE,  Fiddle::Pointer[view.to_a.pack('F*')])
-    glUniformMatrix4fv(uniProj, 1, GL_FALSE, Fiddle::Pointer[proj.to_a.pack('F*')])
+    glUniformMatrix4fv(uniform_view, 1, GL_FALSE, Fiddle::Pointer[view.to_a.pack('F*')])
+    glUniformMatrix4fv(uniform_proj, 1, GL_FALSE, Fiddle::Pointer[proj.to_a.pack('F*')])
 
     # used for darkening the reflection color
-    uniColor = @shaderProgram.uniform_location('overrideColor')
+    uniform_color = @shader_program.uniform_location('overrideColor')
 
     # Create initial model matrix
     # ( original used glm::mat4(1.0f) )
@@ -182,14 +132,13 @@ class Stencils
 
       # Calculate new rotation
       model = model.rotationAxis(RMath3D::RVec3.new(0.0, 0.0, 1.0),
-                                                   (time * 180.0.to_rad))
+                                 (time * 180.0.to_rad))
 
       # Update shader with new rotation
-      glUniformMatrix4fv(uniModel,
+      glUniformMatrix4fv(uniform_model,
                          1,
                          GL_FALSE,
                          Fiddle::Pointer[model.to_a.pack('F*')])
-
 
       # Draw cube
       glDrawArrays(GL_TRIANGLES, 0, 36)
@@ -212,24 +161,24 @@ class Stencils
 
       # draw reflection:
       # set any stencil to 1
-      glStencilFunc(GL_EQUAL, 1, 0xFF) 
+      glStencilFunc(GL_EQUAL, 1, 0xFF)
       # don't write to stencil buffer
-      glStencilMask(0x00) 
+      glStencilMask(0x00)
       # write to depth buffer
-      glDepthMask(GL_TRUE) 
+      glDepthMask(GL_TRUE)
 
       # translate and scale the model matrix
       # ( original used a nested call: glm::scale(glm::translate(0,0,-1), (1,1,-1)) )
       model = model * translation * scaling
 
       # Update shader with new scaling
-      glUniformMatrix4fv(uniModel, 
-                         1, 
-                         GL_FALSE, 
+      glUniformMatrix4fv(uniform_model,
+                         1,
+                         GL_FALSE,
                          Fiddle::Pointer[model.to_a.pack('F*')])
-      glUniform3f(uniColor, 0.3, 0.3, 0.3)
+      glUniform3f(uniform_color, 0.3, 0.3, 0.3)
       glDrawArrays(GL_TRIANGLES, 0, 36)
-      glUniform3f(uniColor, 1.0, 1.0, 1.0)
+      glUniform3f(uniform_color, 1.0, 1.0, 1.0)
 
       glDisable(GL_STENCIL_TEST)
 
@@ -238,5 +187,17 @@ class Stencils
   end
 end
 
-window = Application.new(800, 600, 'stencils')
+opts = Optimist.options do
+  opt :size, 'width X height string', default: '800x600'
+  opt :verbose, 'say a lot', default: false
+end
+window_size = Utils.parse_window_size(opts[:size])
+Optimist.die('Valid size string is required') unless window_size
+Optimist.die('Valid width is required') unless window_size[:width] > 0
+Optimist.die('Valid height is required') unless window_size[:height] > 0
+
+window = Application.new(window_size[:width],
+                         window_size[:height],
+                         'stencils',
+                         opts[:verbose])
 Stencils.new(window).draw

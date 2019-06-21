@@ -56,18 +56,14 @@ module Utils
   # Provided as a fallback in case the platform is too old to use glDebugMessage
   def self.gl_get_one_error
     e = glGetError()
-    if e != GL_NO_ERROR
-      "glGetError: #{GL_ERROR_TYPE[e.to_i]}, from: #{caller(1..1).first}"
-    end
+    return if e == GL_NO_ERROR
+
+    "glGetError: #{GL_ERROR_TYPE[e.to_i]}, from: #{caller(1..1).first}"
   end
 
   def self.gl_get_errors
     e = glGetError()
-    while e != GL_NO_ERROR
-      #logger.error "glGetError: #{GL_ERROR_TYPE[e.to_i]}, from: #{caller.join("\n")}"
-      #e = glGetError()
-      logger.error gl_get_one_error
-    end
+    logger.error gl_get_one_error while e != GL_NO_ERROR
   end
 
   def self.gl_enable_debug_output
@@ -113,9 +109,9 @@ module Utils
   class Shader
     include Logging
 
-    TYPES = {vertex:   OpenGL::GL_VERTEX_SHADER,
-             fragment: OpenGL::GL_FRAGMENT_SHADER,
-             geometry: OpenGL::GL_GEOMETRY_SHADER}.freeze
+    TYPES = { vertex:   OpenGL::GL_VERTEX_SHADER,
+              fragment: OpenGL::GL_FRAGMENT_SHADER,
+              geometry: OpenGL::GL_GEOMETRY_SHADER }.freeze
 
     attr_reader :id
     def initialize(type = :vertex)
@@ -138,14 +134,14 @@ module Utils
         log_length = log_buffer.unpack('L')[0]
         log = ' ' * log_length
         glGetShaderInfoLog(@id, log_length, Fiddle::Pointer[0], log)
-        # TODO if we're in a debug context, we may not get output here and it may have gone straight to debug console
+        # TODO: if we're in a debug context, we may not get output here and it may have gone straight to debug console
         logger.error log
       end
       status == GL_TRUE
     end
   end
 
-  # TODO should have a overall Shader object keeping track of which ShaderProgram is in use
+  # TODO: should have a overall Shader object keeping track of which ShaderProgram is in use
   class ShaderProgram
     include Logging
     attr_reader :id, :linked
@@ -177,18 +173,18 @@ module Utils
     end
 
     def create_from_vert_frag(vertex_shader_source, frag_shader_source)
-      vertexShader = Utils::Shader.new(:vertex)
-      vertexShader.load(vertex_shader_source)
-      fragShader = Utils::Shader.new(:fragment)
-      fragShader.load(frag_shader_source)
-      attach(vertexShader)
-      attach(fragShader)
+      vertex_shader = Utils::Shader.new(:vertex)
+      vertex_shader.load(vertex_shader_source)
+      frag_shader = Utils::Shader.new(:fragment)
+      frag_shader.load(frag_shader_source)
+      attach(vertex_shader)
+      attach(frag_shader)
       link
     end
 
     # ex: {vertex: <source>, fragment: <source>}
     def load_from(shader_sources)
-      shader_sources.each_pair {|k,v| load_and_attach(k, v)}
+      shader_sources.each_pair { |k, v| load_and_attach(k, v) }
     end
 
     def load_and_attach(type, shader_source)
@@ -204,17 +200,18 @@ module Utils
       slot
     end
 
-    # TODO should probably take hash args
-    def enable_vertex_attrib(name, size, type, stride, offset=0)
+    # TODO: should probably take hash args
+    def enable_vertex_attrib(name, size, type, stride, offset = 0)
       vertex_attribute = glGetAttribLocation(@id, name)
       if vertex_attribute != -1
         glEnableVertexAttribArray(vertex_attribute)
         logger.debug {"enabling vertex attrib array for '#{name}'"\
                       "(#{vertex_attribute}): "\
                       "size: #{size}, "\
-                      "type: #{type.to_s}, "\
+                      "type: #{type}, "\
                       "stride: #{stride}, "\
-                      "offset: #{offset}"}
+                      "offset: #{offset}"
+        }
         glVertexAttribPointer(vertex_attribute,
                               size,
                               gl_type(type),
@@ -223,8 +220,7 @@ module Utils
                               fiddle_type(type) * stride,
                               # Yes, the offset argument is weird(an offset void* pointer)
                               # Blame the OpenGL ARB and backwards-compatibility hacks!
-                              Utils::NullPtr + fiddle_type(type) * offset
-                             )
+                              Utils::NullPtr + fiddle_type(type) * offset)
         vertex_attribute
       else
         logger.info("shader vertex attribute '#{name}' was requested but not found(possibly stripped by driver)")
@@ -237,21 +233,17 @@ module Utils
     end
 
     def gl_type(type_name)
-      begin
-        Object.const_get("GL_#{type_name.to_s.upcase}")
-      rescue NameError
-        logger.info("gl_type: '#{type_name}' does not match a GL_ constant")
-        return nil
-      end
+      Object.const_get("GL_#{type_name.to_s.upcase}")
+    rescue NameError
+      logger.info("gl_type: '#{type_name}' does not match a GL_ constant")
+      nil
     end
 
     def fiddle_type(type_name)
-      begin
-        Object.const_get("Fiddle::SIZEOF_#{type_name.to_s.upcase}")
-      rescue NameError
-        logger.error("fiddle_type: '#{type_name}' does not match a Fiddle::SIZEOF_ constant")
-        return nil
-      end
+      Object.const_get("Fiddle::SIZEOF_#{type_name.to_s.upcase}")
+    rescue NameError
+      logger.error("fiddle_type: '#{type_name}' does not match a Fiddle::SIZEOF_ constant")
+      nil
     end
   end
 
@@ -260,12 +252,12 @@ module Utils
     # @slots: count is GL_TEXTURE<n>, value is requested name
     include Logging
     attr_reader :slots
-    # FIXME this is just from _my_ system, not sure if there's a set limit of GL_TEXTURE<n> units
+    # FIXME: this is just from _my_ system, not sure if there's a set limit of GL_TEXTURE<n> units
     # this _should_ be 48 by the Opengl 3 standard, but it is driver-specific(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS - 1)
     MAX_UNITS = 31
     def initialize
       @slots = []
-      # TODO maybe hold an array of hashes:
+      # TODO: maybe hold an array of hashes:
       # array count is texture unit (0-based)
       # hash is: name, opengl buffer handle
       # [{name: texMoon, buffer: 1}, {name: texEarth, buffer: 2}]
@@ -281,9 +273,9 @@ module Utils
       tex_buf = Fiddle::Pointer.malloc(Fiddle::SIZEOF_INT)
       glGenTextures(1, tex_buf)
       tex_slot = tex_buf[0, Fiddle::SIZEOF_INT].unpack('L')[0]
-      # TODO not really sure if I need this call to activeTexture?
+      # TODO: not really sure if I need this call to activeTexture?
       glActiveTexture(Object.const_get("GL_TEXTURE#{slot}"))
-      logger.debug {"load_texture: loading #{filename} to name #{name} to buffer #{tex_slot}, unit GL_TEXTURE#{slot}"}
+      logger.debug { "load_texture: loading #{filename} to name #{name} to buffer #{tex_slot}, unit GL_TEXTURE#{slot}" }
       glBindTexture(GL_TEXTURE_2D, tex_slot)
 
       # set clamping for s and t coordinates
@@ -299,7 +291,7 @@ module Utils
       mode = image.bytes_per_pixel == 4 ? GL_RGBA : GL_RGB
       glTexImage2D(GL_TEXTURE_2D, 0, mode, image.w, image.h, 0, mode, GL_UNSIGNED_BYTE, image_ptr)
       image.destroy
-      # TODO do I need to reset glActiveTexture back to 0 ?
+      # TODO: do I need to reset glActiveTexture back to 0 ?
       @slots << name
       slot_for(name)
     end
@@ -313,10 +305,10 @@ module Utils
       tex_buf = Fiddle::Pointer.malloc(Fiddle::SIZEOF_INT)
       glGenTextures(1, tex_buf)
       tex_slot = tex_buf[0, Fiddle::SIZEOF_INT].unpack('L')[0]
-      logger.debug {"creating #{name} (#{width}x#{height}) texture in buffer #{tex_slot}, unit GL_TEXTURE#{slot}"}
+      logger.debug { "creating #{name} (#{width}x#{height}) texture in buffer #{tex_slot}, unit GL_TEXTURE#{slot}" }
       glBindTexture(GL_TEXTURE_2D, tex_slot)
 
-      # TODO generify
+      # TODO: generify
       glTexImage2D(GL_TEXTURE_2D,
                    0,
                    GL_RGB,
@@ -336,7 +328,7 @@ module Utils
       @slots.index(name)
     end
 
-    def bind(name, type=GL_TEXTURE_2D)
+    def bind(name, type = GL_TEXTURE_2D)
       glBindTexture(type, slot_for(name))
     end
 
@@ -352,12 +344,12 @@ module Utils
 
   class Texture
     attr_reader :id
-    Types = [OpenGL::GL_TEXTURE_1D, OpenGL::GL_TEXTURE_2D]
+    TYPES = [OpenGL::GL_TEXTURE_1D, OpenGL::GL_TEXTURE_2D].freeze
     def initialize(type)
       tex_buf = Fiddle::Pointer.malloc(Fiddle::SIZEOF_INT)
       glGenTextures(1, tex_buf)
       @id = tex_buf[0, Fiddle::SIZEOF_INT].unpack('L')[0]
-      if Types.include?(type)
+      if TYPES.include?(type)
         @type = type
       else
         raise ArgumentError "#{type} is not valid"
@@ -367,6 +359,7 @@ module Utils
     def bind
       glBindTexture(@type, @id)
     end
+
     def create(width, height)
       glTexImage2D(GL_TEXTURE_2D,
                    0,
@@ -379,7 +372,7 @@ module Utils
                    Utils::NullPtr)
     end
 
-    # FIXME better names
+    # FIXME: better names
     def texParameter(set, value)
       glTexParameteri(@type, set, value)
     end
@@ -398,7 +391,6 @@ module Utils
     def bind
       glBindVertexArray(@id)
     end
-
   end
 
   class VertexBuffer
@@ -411,7 +403,7 @@ module Utils
       @id = buf[0, Fiddle::SIZEOF_INT].unpack('L')[0]
     end
 
-    # FIXME it'd be nice to have this as a module-method, but Logging doesn't then work
+    # FIXME: it'd be nice to have this as a module-method, but Logging doesn't then work
     def fiddle_type(type_name)
       Object.const_get("Fiddle::SIZEOF_#{type_name.to_s.upcase}")
     end
@@ -421,9 +413,9 @@ module Utils
     end
 
     # type is a symbol: :float, :int, etc.
-    def load_buffer(data, type, mode=GL_STATIC_DRAW)
-      # FIXME pack command should vary by type
-      data_ptr = Fiddle::Pointer[data.flatten.pack("F*")]
+    def load_buffer(data, type, mode = GL_STATIC_DRAW)
+      # FIXME: pack command should vary by type
+      data_ptr = Fiddle::Pointer[data.flatten.pack('F*')]
       data_size = fiddle_type(type) * data.flatten.length
       glBufferData(GL_ARRAY_BUFFER, data_size, data_ptr, mode)
       @loaded = true
@@ -458,15 +450,15 @@ module Utils
     end
 
     def complete?
-      status == :complete ? true : false
+      status == :complete
     end
 
-    def texture2D(texBuffer)
-      # TODO need a slot list at some point
+    def texture2D(tex_buffer)
+      # TODO: need a slot list at some point
       glFramebufferTexture2D(GL_FRAMEBUFFER,
                              GL_COLOR_ATTACHMENT0,
                              GL_TEXTURE_2D,
-                             texBuffer,
+                             tex_buffer,
                              0)
 
     end

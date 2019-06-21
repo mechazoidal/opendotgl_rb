@@ -11,7 +11,7 @@ when :OPENGL_PLATFORM_MACOSX
 when :OPENGL_PLATFORM_LINUX
   OpenGL.load_lib()
 else
-  raise RuntimeError, "Unsupported platform."
+  raise RuntimeError, 'Unsupported platform.'
 end
 
 require 'sdl2'
@@ -21,10 +21,10 @@ class Application
 
   attr_reader :window, :width, :height
 
-  def initialize(width, height, name = "opendotgl_rb", debug = false)
-    debug ? logger.level = :debug : logger.level = :info
-    logger.formatter = proc {|severity, datetime, progname, msg|
-      "[#{datetime.strftime("%Y-%m-%d %H:%M:%S.%s")}] #{severity} -- #{msg}\n"
+  def initialize(width, height, name = 'opendotgl_rb', debug = false)
+    logger.level = debug ? :debug : :info
+    logger.formatter = proc { |severity, datetime, _progname, msg|
+      "[#{datetime.strftime('%Y-%m-%d %H:%M:%S.%s')}] #{severity} -- #{msg}\n"
     }
 
     @running = false
@@ -35,7 +35,6 @@ class Application
     SDL2::GL.set_attribute(SDL2::GL::ALPHA_SIZE, 8)
     SDL2::GL.set_attribute(SDL2::GL::DOUBLEBUFFER, 1)
 
-
     # forward-compatible OpenGL 3.2 context
     SDL2::GL.set_attribute(SDL2::GL::CONTEXT_PROFILE_MASK, SDL2::GL::CONTEXT_PROFILE_CORE)
     SDL2::GL.set_attribute(SDL2::GL::CONTEXT_MAJOR_VERSION, 3)
@@ -44,7 +43,7 @@ class Application
 
     if debug
       # request debug context
-      logger.info "OpenGL debug context requested"
+      logger.info 'OpenGL debug context requested'
       SDL2::GL.set_attribute(SDL2::GL::CONTEXT_FLAGS, SDL2::GL::CONTEXT_DEBUG_FLAG)
     end
 
@@ -52,20 +51,19 @@ class Application
     @height = height
     @window = SDL2::Window.create(name, 0, 0, @width, @height, SDL2::Window::Flags::OPENGL)
     @context = SDL2::GL::Context.create(@window)
-    logger.info {"SDL2 OpenGL version #{SDL2::GL.get_attribute(SDL2::GL::CONTEXT_MAJOR_VERSION)}.#{SDL2::GL.get_attribute(SDL2::GL::CONTEXT_MINOR_VERSION)}"}
+    logger.info { "SDL2 OpenGL version #{SDL2::GL.get_attribute(SDL2::GL::CONTEXT_MAJOR_VERSION)}.#{SDL2::GL.get_attribute(SDL2::GL::CONTEXT_MINOR_VERSION)}" }
     # GLEW/GLEE isn't needed since opengl-bindings gem automatically enumerates all available dynamic functions&constants
 
     if debug
       # check if we did get a debug context
       # FIXME need to AND the flags to make sure it's right
       if SDL2::GL.get_attribute(SDL2::GL::CONTEXT_FLAGS) == 1
-        logger.info "OpenGL debug context activated"
-        Utils::gl_enable_debug_output
+        logger.info 'OpenGL debug context activated'
+        Utils.gl_enable_debug_output
       end
     end
 
     # force vsync
-    SDL2::GL::swap_interval = 1
+    SDL2::GL.swap_interval = 1
   end
-
 end

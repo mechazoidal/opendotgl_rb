@@ -1,26 +1,15 @@
 require_relative './lib/application'
 require_relative './lib/utils'
+require_relative './data'
 require 'optimist'
 
 class Textures
   include Logging
   attr_reader :name
-  VERTICES = [  # Position | Color   |  Texcoords   |
-                # Top-left
-                [-0.5,  0.5, 1.0, 0.0, 0.0, 0.0, 0.0],
-                # Top-right
-                [ 0.5,  0.5, 0.0, 1.0, 0.0, 1.0, 0.0],
-                # Bottom-right
-                [ 0.5, -0.5, 0.0, 0.0, 1.0, 1.0, 1.0],
-                # Bottom-left
-                [-0.5, -0.5, 1.0, 1.0, 1.0, 0.0, 1.0]
-  ].freeze
-  ELEMENTS = [
-    0, 1, 2,
-    2, 3, 0
-  ].freeze
+  VERTICES = GeometryData::Textures::VERTICES
+  ELEMENTS = GeometryData::ELEMENTS
 
-  def initialize(window, frag_shader, vert_shader='vert_shader.glsl')
+  def initialize(window, frag_shader, vert_shader = 'vert_shader.glsl')
     @window = window
     @name = 'textures'
     @vert_source = File.join('shaders', @name, vert_shader)
@@ -61,7 +50,6 @@ class Textures
                  element_data_size,
                  element_data_ptr,
                  GL_STATIC_DRAW)
-
   end
 
   def create_shader_program
@@ -83,50 +71,50 @@ class Textures
   def setup_position_vertex_attribute
     # Setup our vertex attributes
     # Note that if the fragment shader does not USE the attribute, the GLSL compiler is free to strip it!
-    # Thus we can't blindly enable the vertex attrib array unless we get a real location back.
+    # Thus we can't blindly enable the vertex array attribute unless we get a real location back.
     position_attribute = glGetAttribLocation(@shader_program, 'position')
-    if position_attribute != -1
-      glEnableVertexAttribArray(position_attribute)
-      glVertexAttribPointer(position_attribute,
-                            # size
-                            2,
-                            # type
-                            GL_FLOAT,
-                            # normalized?
-                            GL_FALSE,
-                            # stride: 5 items in each vertex(x,y,r,g,b)
-                            Fiddle::SIZEOF_FLOAT * VERTICES[0].length,
-                            # no offset required
-                            0)
-    end
+    return if position_attribute == -1
+
+    glEnableVertexAttribArray(position_attribute)
+    glVertexAttribPointer(position_attribute,
+                          # size
+                          2,
+                          # type
+                          GL_FLOAT,
+                          # normalized?
+                          GL_FALSE,
+                          # stride: 5 items in each vertex(x,y,r,g,b)
+                          Fiddle::SIZEOF_FLOAT * VERTICES[0].length,
+                          # no offset required
+                          0)
   end
 
   def setup_color_vertex_attribute
     color_attribute = glGetAttribLocation(@shader_program, 'color')
-    if color_attribute != -1
-      glEnableVertexAttribArray(color_attribute)
-      glVertexAttribPointer(color_attribute,
-                            3,
-                            GL_FLOAT,
-                            GL_FALSE,
-                            Fiddle::SIZEOF_FLOAT * VERTICES[0].length,
-                            # Offset pointer: space for 2 floats, cast to void*
-                            (Fiddle::Pointer[0] + Fiddle::SIZEOF_FLOAT * 2))
-    end
+    return if color_attribute == -1
+
+    glEnableVertexAttribArray(color_attribute)
+    glVertexAttribPointer(color_attribute,
+                          3,
+                          GL_FLOAT,
+                          GL_FALSE,
+                          Fiddle::SIZEOF_FLOAT * VERTICES[0].length,
+                          # Offset pointer: space for 2 floats, cast to void*
+                          (Fiddle::Pointer[0] + Fiddle::SIZEOF_FLOAT * 2))
   end
 
   def setup_texcoord_vertex_attribute
     texcoord_attribute = glGetAttribLocation(@shader_program, 'texcoord')
-    if texcoord_attribute != -1
-      glEnableVertexAttribArray(texcoord_attribute)
-      glVertexAttribPointer(texcoord_attribute,
-                            2,
-                            GL_FLOAT,
-                            GL_FALSE,
-                            Fiddle::SIZEOF_FLOAT * VERTICES[0].length,
-                            # Offset pointer: space for 2 floats, cast to void*
-                            (Fiddle::Pointer[0] + Fiddle::SIZEOF_FLOAT * 5))
-    end
+    return if texcoord_attribute == -1
+
+    glEnableVertexAttribArray(texcoord_attribute)
+    glVertexAttribPointer(texcoord_attribute,
+                          2,
+                          GL_FLOAT,
+                          GL_FALSE,
+                          Fiddle::SIZEOF_FLOAT * VERTICES[0].length,
+                          # Offset pointer: space for 2 floats, cast to void*
+                          (Fiddle::Pointer[0] + Fiddle::SIZEOF_FLOAT * 5))
   end
 
   def load_texture(filename, name, slot, tex_buffer)
@@ -185,17 +173,17 @@ class Checkerboard < Textures
     glGenTextures(1, tex_buf)
     tex = tex_buf[0, Fiddle::SIZEOF_INT].unpack('L')[0]
     glBindTexture(GL_TEXTURE_2D, tex)
-    #glActiveTexture(@textures[slot])
+    # glActiveTexture(@textures[slot])
 
     # x,y,z = s,t,r in textures
 
     # set clamping for s and t coordinates
-    #glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
-    #glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+    # glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+    # glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
 
     # Specify interpolation for scaling up/down
-    #glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
-    #glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+    # glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+    # glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
 
     # BW checkerboard
     pixels = [
@@ -209,9 +197,9 @@ class Checkerboard < Textures
 
     # change border color to red
     # FIXME not working?
-    #color = [1.0, 0.0, 0.0, 1.0]
-    #color_ptr = Fiddle::Pointer[color.pack('F*')]
-    #glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, color_ptr)
+    # color = [1.0, 0.0, 0.0, 1.0]
+    # color_ptr = Fiddle::Pointer[color.pack('F*')]
+    # glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, color_ptr)
 
     pixels_ptr = Fiddle::Pointer[pixels.pack('F*')]
 
@@ -437,9 +425,9 @@ Optimist.die('Valid height is required') unless window_size[:height] > 0
 Optimist.die("Example must be one of: #{examples}") unless examples.include?(opts[:example])
 
 window = Application.new(window_size[:width],
-                    window_size[:height],
-                    'textures',
-                    opts[:verbose])
+                         window_size[:height],
+                         'textures',
+                         opts[:verbose])
 
 case opts[:example]
 when 'checkerboard'

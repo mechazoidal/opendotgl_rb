@@ -1,27 +1,31 @@
 require_relative './lib/application'
 require_relative './lib/utils'
 require_relative './data'
+require 'optimist'
 require 'rmath3d/rmath3d'
 
 class Feedback
   include Logging
-  FeedbackVaryings = 'outValue'
   def initialize(window)
     @window = window
     @name = 'feedback'
   end
+end
 
-  def calculate
+class Calculate < Feedback
+  # this is named 'draw' for consistency,
+  # even though it doesn't actually draw anything!
+  def draw
     vertex_source = File.join('shaders', @name, 'vertexShader.glsl')
     geometry_source = File.join('shaders', @name, 'geoShader.glsl')
-    @shaderProgram = Utils::ShaderProgram.new
-    @shaderProgram.load_and_attach(:vertex, File.open(vertex_source, 'r', &:read))
-    @shaderProgram.load_and_attach(:geometry, File.open(geometry_source, 'r', &:read))
+    @shader_program = Utils::ShaderProgram.new
+    @shader_program.load_and_attach(:vertex, File.open(vertex_source, 'r', &:read))
+    @shader_program.load_and_attach(:geometry, File.open(geometry_source, 'r', &:read))
 
     varying_ptr = ['outValue'].pack('p')
-    glTransformFeedbackVaryings(@shaderProgram.id, 1, varying_ptr, GL_INTERLEAVED_ATTRIBS)
-    @shaderProgram.link
-    @shaderProgram.use
+    glTransformFeedbackVaryings(@shader_program.id, 1, varying_ptr, GL_INTERLEAVED_ATTRIBS)
+    @shader_program.link
+    @shader_program.use
 
     @vao = Utils::VertexArray.new
     @vao.bind
@@ -31,7 +35,7 @@ class Feedback
     @vbo = Utils::VertexBuffer.new
     @vbo.bind
     @vbo.load_buffer(data, :float)
-    @shaderProgram.enable_vertex_attrib('inValue', 1, :float, 0)
+    @shader_program.enable_vertex_attrib('inValue', 1, :float, 0)
 
     # Create transform buffer
     @tbo = Utils::VertexBuffer.new
@@ -64,9 +68,12 @@ class Feedback
     glFlush()
     # get results back
     feedback = Fiddle::Pointer.malloc(Fiddle::SIZEOF_FLOAT * 15)
-    glGetBufferSubData(GL_TRANSFORM_FEEDBACK_BUFFER, Utils::NullPtr, (15 * Fiddle::SIZEOF_FLOAT), feedback)
+    glGetBufferSubData(GL_TRANSFORM_FEEDBACK_BUFFER,
+                       Utils::NullPtr,
+                       (15 * Fiddle::SIZEOF_FLOAT),
+                       feedback)
     response = feedback[0, @data_size].unpack('F*')
-    response.each {|n| puts n}
+    response.each { |n| puts n }
 
     # get query results
     prim_buf = Fiddle::Pointer.malloc(Fiddle::SIZEOF_INT)
@@ -76,13 +83,11 @@ class Feedback
   end
 end
 
-class FeedbackGravity
-  include Logging
-  FeedbackVaryings = ['outPosition', 'outVelocity']
-
+class Gravity < Feedback
   def initialize(window)
-    @window = window
-    @name = 'feedback'
+    super(window)
+    @previous_frame_time = 0
+    @frame_time = 0
   end
 
   def draw
@@ -91,25 +96,25 @@ class FeedbackGravity
     vertex_source = File.join('shaders', @name, 'vertexShader_gravity.glsl')
     frag_source = File.join('shaders', @name, 'fragmentShader.glsl')
     @shader_program = Utils::ShaderProgram.new
-    @shader_program.load_from({vertex: File.open(vertex_source, 'r', &:read),
-                              fragment: File.open(frag_source, 'r', &:read)})
-    varying_ptr = ['outPosition', 'outVelocity'].pack('p*')
-    
+    @shader_program.load_from(vertex: File.open(vertex_source, 'r', &:read),
+                              fragment: File.open(frag_source, 'r', &:read))
+    varying_ptr = %w[outPosition outVelocity].pack('p*')
+
     glTransformFeedbackVaryings(@shader_program.id, 2, varying_ptr, GL_INTERLEAVED_ATTRIBS)
     @shader_program.link
     @shader_program.use
 
-    uniTime = @shader_program.uniform_location('time')
-    uniMousePos = @shader_program.uniform_location('mousePos')
+    uniform_time = @shader_program.uniform_location('time')
+    uniform_mouse_pos = @shader_program.uniform_location('mousePos')
 
     @vao = Utils::VertexArray.new
     @vao.bind
 
-    # OPTIMIZE
     # Vertex format: 6 floats per vertex:
     # pos.x  pox.y  vel.x  vel.y  origPos.x  origPos.y
-    @data = Array.new(600) {0.0}
+    @data = Array.new(600) { 0.0 }
     10.times do |y|
+      # OPTIMIZE: should probably use .each_cons(4) or .each_slice(4)
       10.times do |x|
         @data[60 * y + 6 * x] = 0.2 * x - 0.9
         @data[60 * y + 6 * x + 1] = 0.2 * y - 0.9
@@ -120,7 +125,6 @@ class FeedbackGravity
 
     @data_size = Fiddle::SIZEOF_FLOAT * @data.length
     @data_ptr = Fiddle::Pointer[@data.pack('F*')]
-
 
     @vbo = Utils::VertexBuffer.new
     @vbo.bind
@@ -141,8 +145,6 @@ class FeedbackGravity
     # We will receive 400 items back from the feedback (4 items per row * 100 rows)
     @feedback_length = 400
     @feedback_size = Fiddle::SIZEOF_FLOAT * @feedback_length
-    # Set an explicit free() function to prevent garbage-collection 
-    #@feedback = Fiddle::Pointer.malloc(@feedback_size, Utils::FreeFunction)
     @feedback = Fiddle::Pointer.malloc(@feedback_size)
     @vbo.bind
 
@@ -155,7 +157,7 @@ class FeedbackGravity
     # any initial behavior with nonsense coordinates
     mouse_x = @window.width / 2
     mouse_y = @window.height / 2
-    SDL2::Mouse::Cursor::warp(@window.window, mouse_x, mouse_y)
+    SDL2::Mouse::Cursor.warp(@window.window, mouse_x, mouse_y)
 
     while @running
       event = SDL2::Event.poll
@@ -179,11 +181,10 @@ class FeedbackGravity
       time = (now - previous_time)
       previous_time = now
 
-      glUniform1f(uniTime, time)
+      glUniform1f(uniform_time, time)
 
       # Send updated mouse position to shader
-      glUniform2f(uniMousePos, mouse_x / 400.0 - 1, -mouse_y / 400.0 + 1)
-
+      glUniform2f(uniform_mouse_pos, mouse_x / 400.0 - 1, -mouse_y / 400.0 + 1)
 
       # Setup a query for rendering details.
       buf = Fiddle::Pointer.malloc(Fiddle::SIZEOF_INT)
@@ -205,8 +206,8 @@ class FeedbackGravity
       glGetBufferSubData(GL_TRANSFORM_FEEDBACK_BUFFER, 0, @feedback_size, @feedback)
       response = @feedback[0, @feedback_size].unpack('F*')
 
-      # FIXME optimize array manipulation?
       # each "row" is 4: 100.times {4} = 400
+      # OPTIMIZE: should probably use .each_cons(4) or .each_slice(4)
       100.times do |i|
         @data[6 * i] = response[4 * i]
         @data[6 * i + 1] = response[4 * i + 1]
@@ -218,17 +219,40 @@ class FeedbackGravity
       # so we use this call to just update the existing buffer
       glBufferSubData(GL_ARRAY_BUFFER, 0, @data_size, Fiddle::Pointer[@data.pack('F*')])
 
-      # get time elapsed from query if debugging
-      logger.debug {
-        time_buf = Fiddle::Pointer.malloc(Fiddle::SIZEOF_INT)
-        glGetQueryObjectuiv(query, GL_QUERY_RESULT, time_buf)
-        time_elapsed = time_buf[0, Fiddle::SIZEOF_INT].unpack('L*')[0]
-        "Frame time: #{time_elapsed}"
-      }
+      # get time elapsed from query
+      time_buf = Fiddle::Pointer.malloc(Fiddle::SIZEOF_INT)
+      glGetQueryObjectuiv(query, GL_QUERY_RESULT, time_buf)
+      time_elapsed = time_buf[0, Fiddle::SIZEOF_INT].unpack('L*')[0]
+      frame_average = (time_elapsed + @previous_frame_time) / 2
+      @previous_frame_time = @frame_time
+      @frame_time = frame_average
     end
+    puts "Average per-frame time: #{@frame_time} ns"
   end
 end
 
-window = Application.new(800, 600, 'feedback')
-#Feedback.new(window).calculate
-FeedbackGravity.new(window).draw
+examples = %w[calculate gravity]
+
+opts = Optimist.options do
+  opt :size, 'width X height string', default: '800x600'
+  opt :example, "example to run: #{examples.join(', ')}", default: 'calculate'
+  opt :verbose, 'say a lot', default: false
+end
+
+window_size = Utils.parse_window_size(opts[:size])
+Optimist.die('Valid size string is required') unless window_size
+Optimist.die('Valid width is required') unless window_size[:width] > 0
+Optimist.die('Valid height is required') unless window_size[:height] > 0
+Optimist.die("Example must be one of: #{examples}") unless examples.include?(opts[:example])
+
+window = Application.new(window_size[:width],
+                         window_size[:height],
+                         'feedback',
+                         opts[:verbose])
+
+case opts[:example]
+when 'calculate'
+  Calculate.new(window).draw
+when 'gravity'
+  Gravity.new(window).draw
+end

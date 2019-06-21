@@ -2,11 +2,16 @@ require_relative './lib/application'
 require_relative './lib/utils'
 require_relative './data'
 
+require 'optimist'
 require 'rmath3d/rmath3d'
 
 class Framebuffer
   include Logging
   using Utils::RadianHelper
+
+  # re-using the cube from stencils.rb
+  VERTICES = GeometryData::Stencils::VERTICES
+  QUAD_VERTICES = GeometryData::Framebuffer::QUAD_VERTICES
 
   def initialize(window)
     @window = window
@@ -33,24 +38,23 @@ class Framebuffer
     @vbo_quad = Utils::VertexBuffer.new
 
     @vbo_cube.bind
-    @vbo_cube.load_buffer(GeometryData::VERTICES, :float)
+    @vbo_cube.load_buffer(VERTICES, :float)
 
     @vbo_quad.bind
-    @vbo_quad.load_buffer(GeometryData::QUAD_VERTICES, :float)
-
+    @vbo_quad.load_buffer(QUAD_VERTICES, :float)
 
     # No element buffers required for this lesson, as we use glDrawArrays
 
     # setup shaders
     @scene_shader_program = Utils::ShaderProgram.new
-    @scene_shader_program.load_from({vertex: File.open(scene_vertex_source, 'r', &:read),
-                                     fragment: File.open(scene_frag_source, 'r', &:read)})
+    @scene_shader_program.load_from(vertex: File.open(scene_vertex_source, 'r', &:read),
+                                    fragment: File.open(scene_frag_source, 'r', &:read))
     @scene_shader_program.bind_frag('outColor')
     @scene_shader_program.link
 
     @screen_shader_program = Utils::ShaderProgram.new
-    @screen_shader_program.load_from({vertex: File.open(screen_vertex_source, 'r', &:read),
-                                    fragment: File.open(screen_frag_source, 'r', &:read)})
+    @screen_shader_program.load_from(vertex: File.open(screen_vertex_source, 'r', &:read),
+                                     fragment: File.open(screen_frag_source, 'r', &:read))
     @screen_shader_program.link
     # end shader setup
 
@@ -67,18 +71,18 @@ class Framebuffer
     @screen_shader_program.enable_vertex_attrib('position', 2, :float, 4)
     @screen_shader_program.enable_vertex_attrib('texcoord', 2, :float, 4, 2)
 
-
     @textures.load('sample_moon.png', 'texMoon')
     @textures.load('sample_earth.png', 'texEarth')
 
     @scene_shader_program.use
-    glUniform1i(@scene_shader_program.uniform_location('texEarth'), @textures.slot_for('texEarth'))
-    glUniform1i(@scene_shader_program.uniform_location('texMoon'), @textures.slot_for('texMoon'))
+    glUniform1i(@scene_shader_program.uniform_location('texEarth'),
+                @textures.slot_for('texEarth'))
+    glUniform1i(@scene_shader_program.uniform_location('texMoon'),
+                @textures.slot_for('texMoon'))
 
     @screen_shader_program.use
-    # FIXME not sure what '0' refers to
+    # FIXME: not sure what '0' refers to
     glUniform1i(@screen_shader_program.uniform_location('texFramebuffer'), 0)
-
 
     @frame_buffer = Utils::FrameBuffer.new
     @frame_buffer.bind
@@ -94,10 +98,15 @@ class Framebuffer
     buf = Fiddle::Pointer.malloc(Fiddle::SIZEOF_INT)
     glGenRenderbuffers(1, buf)
     rbo_depth_stencil = buf[0, Fiddle::SIZEOF_INT].unpack('L')[0]
-    glBindRenderbuffer(GL_RENDERBUFFER, rbo_depth_stencil);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, @window.width, @window.height);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo_depth_stencil)
-
+    glBindRenderbuffer(GL_RENDERBUFFER, rbo_depth_stencil)
+    glRenderbufferStorage(GL_RENDERBUFFER,
+                          GL_DEPTH24_STENCIL8,
+                          @window.width,
+                          @window.height)
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER,
+                              GL_DEPTH_STENCIL_ATTACHMENT,
+                              GL_RENDERBUFFER,
+                              rbo_depth_stencil)
 
     # with RenderBuffer this collapses into:
     # rbo_depth_stencil = Utils::RenderBuffer.new
@@ -109,7 +118,7 @@ class Framebuffer
   end
 
   def draw
-    uniModel = @scene_shader_program.uniform_location('model')
+    uniform_model = @scene_shader_program.uniform_location('model')
 
     # Set view matrix(original used glm::lookAt)
     view = RMath3D::RMtx4.new.lookAtRH(
@@ -120,21 +129,21 @@ class Framebuffer
 
     @scene_shader_program.use
 
-    uniView = @scene_shader_program.uniform_location('view');
-    uniProj = @scene_shader_program.uniform_location('proj');
+    uniform_view = @scene_shader_program.uniform_location('view')
+    uniform_proj = @scene_shader_program.uniform_location('proj')
     # set projection matrix(original used glm:perspective)
     proj = RMath3D::RMtx4.new.perspectiveFovRH(45.0.to_rad, # FOV
-                                              # aspect
-                                              (@window.height.to_f / @window.width.to_f),
-                                              # znear
-                                              1.0,
-                                              # zfar
-                                              10.0)
+                                               # aspect
+                                               (@window.height.to_f / @window.width.to_f),
+                                               # znear
+                                               1.0,
+                                               # zfar
+                                               10.0)
     # Send view and proj matrix variables to shader (which will not change per-frame)
-    glUniformMatrix4fv(uniView, 1, GL_FALSE,  Fiddle::Pointer[view.to_a.pack('F*')])
-    glUniformMatrix4fv(uniProj, 1, GL_FALSE, Fiddle::Pointer[proj.to_a.pack('F*')])
+    glUniformMatrix4fv(uniform_view, 1, GL_FALSE, Fiddle::Pointer[view.to_a.pack('F*')])
+    glUniformMatrix4fv(uniform_proj, 1, GL_FALSE, Fiddle::Pointer[proj.to_a.pack('F*')])
 
-    uniColor = @scene_shader_program.uniform_location('overrideColor')
+    uniform_color = @scene_shader_program.uniform_location('overrideColor')
     start_time = Time.now
     # Create initial model matrix
     model = RMath3D::RMtx4.new.setIdentity
@@ -170,10 +179,10 @@ class Framebuffer
 
       # Calculate new rotation
       model = model.rotationAxis(RMath3D::RVec3.new(0.0, 0.0, 1.0),
-                                                   (time * 180.0.to_rad))
+                                 (time * 180.0.to_rad))
 
       # Update shader with new rotation
-      glUniformMatrix4fv(uniModel, 1, GL_FALSE, Fiddle::Pointer[model.to_a.pack('F*')])
+      glUniformMatrix4fv(uniform_model, 1, GL_FALSE, Fiddle::Pointer[model.to_a.pack('F*')])
 
       # Draw cube
       glDrawArrays(GL_TRIANGLES, 0, 36)
@@ -182,34 +191,34 @@ class Framebuffer
       glEnable(GL_STENCIL_TEST)
       # Draw floor:
       # set any stencil to 1
-      glStencilFunc(GL_ALWAYS, 1, 0xFF) 
+      glStencilFunc(GL_ALWAYS, 1, 0xFF)
       glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE)
       # write to stencil buffer
-      glStencilMask(0xFF) 
+      glStencilMask(0xFF)
       # don't write to depth buffer
-      glDepthMask(GL_FALSE) 
+      glDepthMask(GL_FALSE)
       # clear stencil buffer
-      glClear(GL_STENCIL_BUFFER_BIT) 
+      glClear(GL_STENCIL_BUFFER_BIT)
 
       glDrawArrays(GL_TRIANGLES, 36, 6)
 
       # draw reflection:
       # set any stencil to 1
-      glStencilFunc(GL_EQUAL, 1, 0xFF) 
+      glStencilFunc(GL_EQUAL, 1, 0xFF)
       # don't write to stencil buffer
-      glStencilMask(0x00) 
+      glStencilMask(0x00)
       # write to depth buffer
-      glDepthMask(GL_TRUE) 
+      glDepthMask(GL_TRUE)
 
       # translate and scale the model matrix
       # ( original used a nested call: glm::scale(glm::translate(0,0,-1), (1,1,-1)) )
       model = model * translation * scaling
 
       # Update shader with new scaling
-      glUniformMatrix4fv(uniModel, 1, GL_FALSE, Fiddle::Pointer[model.to_a.pack('F*')])
-      glUniform3f(uniColor, 0.3, 0.3, 0.3)
+      glUniformMatrix4fv(uniform_model, 1, GL_FALSE, Fiddle::Pointer[model.to_a.pack('F*')])
+      glUniform3f(uniform_color, 0.3, 0.3, 0.3)
       glDrawArrays(GL_TRIANGLES, 0, 36)
-      glUniform3f(uniColor, 1.0, 1.0, 1.0)
+      glUniform3f(uniform_color, 1.0, 1.0, 1.0)
 
       glDisable(GL_STENCIL_TEST)
 
@@ -229,5 +238,17 @@ class Framebuffer
   end
 end
 
-window = Application.new(800, 600, 'framebuffer') #, true)
+opts = Optimist.options do
+  opt :size, 'width X height string', default: '800x600'
+  opt :verbose, 'say a lot', default: false
+end
+window_size = Utils.parse_window_size(opts[:size])
+Optimist.die('Valid size string is required') unless window_size
+Optimist.die('Valid width is required') unless window_size[:width] > 0
+Optimist.die('Valid height is required') unless window_size[:height] > 0
+
+window = Application.new(window_size[:width],
+                         window_size[:height],
+                         'framebuffer',
+                         opts[:verbose])
 Framebuffer.new(window).draw

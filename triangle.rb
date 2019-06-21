@@ -1,8 +1,11 @@
 require_relative './lib/utils'
+require_relative 'data'
 require_relative './lib/application'
+require 'optimist'
 
 class Triangle
   include Logging
+  VERTICES = GeometryData::Triangle::VERTICES
   def initialize(window)
     @window = window
     @name = 'triangle'
@@ -19,19 +22,12 @@ class Triangle
     vao = buf[0, Fiddle::SIZEOF_INT].unpack('L')[0]
     glBindVertexArray(vao)
 
-    vertices = [
-      [0.0,  0.5, 0.0],
-      [0.5, -0.5, 0.5],
-      [-0.5, -0.5, 1.0]
-    ]
-    # vertices_gray = vertices.map {|n| n[0..1]} # for just the xy coords
-
     vbo_buf = Fiddle::Pointer.malloc(Fiddle::SIZEOF_INT)
     glGenBuffers(1, vbo_buf)
     vbo = vbo_buf[0, Fiddle::SIZEOF_INT].unpack('L')[0]
     glBindBuffer(GL_ARRAY_BUFFER, vbo)
-    vertices_data_ptr = Fiddle::Pointer[vertices.flatten.pack('F*')]
-    vertices_data_size = Fiddle::SIZEOF_FLOAT * vertices.flatten.length
+    vertices_data_ptr = Fiddle::Pointer[VERTICES.flatten.pack('F*')]
+    vertices_data_size = Fiddle::SIZEOF_FLOAT * VERTICES.flatten.length
     glBufferData(GL_ARRAY_BUFFER,
                  vertices_data_size,
                  vertices_data_ptr,
@@ -53,12 +49,17 @@ class Triangle
     # Specify the layout of the vertex data
     position_attribute = glGetAttribLocation(shader_program, 'position')
     glEnableVertexAttribArray(position_attribute)
-    glVertexAttribPointer(position_attribute,       # location
-                          2,                        # size
-                          GL_FLOAT,                 # type
-                          GL_FALSE,                 # normalized?
-                          Fiddle::SIZEOF_FLOAT * vertices[0].length, # stride
-                          Utils::NullPtr)           # array buffer offset
+    glVertexAttribPointer(position_attribute,
+                          # size
+                          2,
+                          # type
+                          GL_FLOAT,
+                          # normalized?
+                          GL_FALSE,
+                          # stride
+                          Fiddle::SIZEOF_FLOAT * VERTICES[0].length,
+                          # array buffer offset (none)
+                          Utils::NullPtr)
 
     color_attribute = glGetAttribLocation(shader_program, 'color')
     glEnableVertexAttribArray(color_attribute)
@@ -66,8 +67,9 @@ class Triangle
                           3,
                           GL_FLOAT,
                           GL_FALSE,
-                          Fiddle::SIZEOF_FLOAT * vertices[0].length,
-                          (Fiddle::Pointer[0] + Fiddle::SIZEOF_FLOAT * 2)) # "Offset" pointer: space for 2 floats, cast to void*
+                          Fiddle::SIZEOF_FLOAT * VERTICES[0].length,
+                          # "Offset" pointer: space for 2 floats, cast to void*
+                          (Fiddle::Pointer[0] + Fiddle::SIZEOF_FLOAT * 2))
 
     while @running
       event = SDL2::Event.poll
@@ -84,12 +86,24 @@ class Triangle
       glClearColor(0.0, 0.0, 0.0, 1.0)
       glClear(GL_COLOR_BUFFER_BIT)
 
-      glDrawArrays(GL_TRIANGLES, 0, vertices.length)
+      glDrawArrays(GL_TRIANGLES, 0, VERTICES.length)
 
       @window.window.gl_swap
     end
   end
 end
 
-window = Application.new(800, 600, 'triangle')
+opts = Optimist.options do
+  opt :size, 'width X height string', default: '800x600'
+  opt :verbose, 'say a lot', default: false
+end
+window_size = Utils.parse_window_size(opts[:size])
+Optimist.die('Valid size string is required') unless window_size
+Optimist.die('Valid width is required') unless window_size[:width] > 0
+Optimist.die('Valid height is required') unless window_size[:height] > 0
+
+window = Application.new(window_size[:width],
+                         window_size[:height],
+                         'triangle',
+                         opts[:verbose])
 Triangle.new(window).draw
