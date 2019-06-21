@@ -20,10 +20,10 @@ class Textures
     2, 3, 0
   ].freeze
 
-  def initialize(window, frag_shader)
+  def initialize(window, frag_shader, vert_shader='vert_shader.glsl')
     @window = window
     @name = 'textures'
-    @vert_source = File.join('shaders', @name, 'vert_shader.glsl')
+    @vert_source = File.join('shaders', @name, vert_shader)
     @frag_source = File.join('shaders', @name, frag_shader)
 
     @textures = [GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2]
@@ -169,13 +169,14 @@ class Textures
   end
 end
 
+# FIXME: not working yet
 class Checkerboard < Textures
   def initialize(window)
-    super(window, 'no_tex_frag.glsl')
+    super(window, 'no_tex_frag.glsl', 'no_tex_vert.glsl')
     create_shader_program
     glUseProgram(@shader_program)
-    #setup_position_vertex_attribute
-    #setup_color_vertex_attribute
+    setup_position_vertex_attribute
+    setup_color_vertex_attribute
   end
 
   def draw
@@ -184,22 +185,24 @@ class Checkerboard < Textures
     glGenTextures(1, tex_buf)
     tex = tex_buf[0, Fiddle::SIZEOF_INT].unpack('L')[0]
     glBindTexture(GL_TEXTURE_2D, tex)
+    #glActiveTexture(@textures[slot])
 
     # x,y,z = s,t,r in textures
 
     # set clamping for s and t coordinates
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+    #glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+    #glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
 
     # Specify interpolation for scaling up/down
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+    #glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+    #glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
 
     # BW checkerboard
     pixels = [
       0.0, 0.0, 0.0,  1.0, 1.0, 1.0,
       1.0, 1.0, 1.0,  0.0, 0.0, 0.0
     ]
+
     # for checkerboard
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT)
